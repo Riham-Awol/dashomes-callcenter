@@ -157,6 +157,14 @@ export interface NotificationItem {
   read: boolean;
 }
 
+export interface OperatorNote {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  operator: string;
+}
+
 export interface DatabaseSchema {
   users: User[];
   teams: Team[];
@@ -167,6 +175,7 @@ export interface DatabaseSchema {
   followups: FollowUp[];
   activity: Activity[];
   notifications?: NotificationItem[];
+  operatorNotes?: OperatorNote[];
 }
 
 export type ViewId =

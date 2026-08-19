@@ -1,4 +1,4 @@
-import { Appointment, Team } from '@/types';
+import { Appointment, Property, Team } from '@/types';
 
 export const esc = (v: any): string =>
   String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
@@ -251,3 +251,93 @@ export function balanceTeamWorkload(appointments: Appointment[], activeTeams: Te
 
   return updated;
 }
+
+export interface TeamDaily15Route {
+  team: Team;
+  items: {
+    id: string;
+    title: string;
+    address: string;
+    kind: 'Booking' | 'Pinned Property';
+    lat?: number | null;
+    lng?: number | null;
+    time?: string;
+    status?: string;
+  }[];
+}
+
+// Generate exactly 15 assigned properties/visits for each active daily team
+export function generateTeamDaily15Routes(
+  appointments: Appointment[],
+  properties: Property[],
+  activeTeams: Team[],
+  pinnedLocations?: { id: string; name: string; lat: number; lng: number; area: string }[]
+): TeamDaily15Route[] {
+  if (!activeTeams || activeTeams.length === 0) return [];
+
+  const balancedAppts = balanceTeamWorkload(appointments, activeTeams);
+  const pins = pinnedLocations || [];
+
+  return activeTeams.map((t, teamIdx) => {
+    const teamAppts = balancedAppts.filter(a => a.teamId === t.id && isToday(a.dt));
+    const items: TeamDaily15Route['items'] = teamAppts.map(a => ({
+      id: a.id,
+      title: `${a.name} (${a.kind})`,
+      address: a.address,
+      kind: 'Booking',
+      lat: a.lat,
+      lng: a.lng,
+      time: a.dt ? fmtTime(a.dt) : '10:00 AM',
+      status: a.status
+    }));
+
+    // Step 1: Fill with approved properties if bookings < 15
+    if (items.length < 15) {
+      const remainingNeed = 15 - items.length;
+      const unassignedProps = properties.filter(
+        p => (p.approvalStatus || 'Approved') === 'Approved' && !items.some(it => it.address === p.address)
+      );
+
+      for (let i = 0; i < Math.min(remainingNeed, unassignedProps.length); i++) {
+        const pr = unassignedProps[i];
+        items.push({
+          id: `prop_fill_${t.id}_${pr.id}_${i}`,
+          title: `Property Shoot: ${pr.name}`,
+          address: pr.address,
+          kind: 'Pinned Property',
+          lat: pr.lat,
+          lng: pr.lng,
+          time: `${9 + (i % 8)}:00 AM`,
+          status: 'Scheduled'
+        });
+      }
+    }
+
+    // Step 2: Fill remaining with pinned gazetteer locations (evenly distributed across teams)
+    if (items.length < 15 && pins.length > 0) {
+      const remainingNeed = 15 - items.length;
+      const pinsPerTeam = Math.ceil(pins.length / activeTeams.length);
+      const teamPins = pins.slice(teamIdx * pinsPerTeam, (teamIdx + 1) * pinsPerTeam);
+
+      for (let i = 0; i < Math.min(remainingNeed, teamPins.length); i++) {
+        const pin = teamPins[i];
+        items.push({
+          id: `pin_fill_${t.id}_${pin.id}_${i}`,
+          title: `📌 ${pin.name}`,
+          address: `${pin.area}, Bole Subcity`,
+          kind: 'Pinned Property',
+          lat: pin.lat,
+          lng: pin.lng,
+          time: `${9 + (i % 8)}:${i % 2 === 0 ? '00' : '30'} AM`,
+          status: 'Scheduled'
+        });
+      }
+    }
+
+    return {
+      team: t,
+      items: items.slice(0, 15)
+    };
+  });
+}
+

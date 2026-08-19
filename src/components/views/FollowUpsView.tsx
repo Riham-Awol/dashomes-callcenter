@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DatabaseSchema, FollowUp, FollowUpStatus, Owner } from '@/types';
+import { DatabaseSchema, FollowUp, FollowUpStatus, Owner, Session } from '@/types';
 import { daysUntil, dOff, exportCSV, fmtD, uid } from '@/lib/utils';
 import { Icon } from '@/lib/icons';
 import { Modal } from '@/components/ui/Modal';
 
 interface FollowUpsViewProps {
   db: DatabaseSchema;
+  session: Session;
   searchQuery: string;
   onUpdateDatabase: (updater: (draft: DatabaseSchema) => void) => void;
   onToast: (msg: string, isErr?: boolean) => void;
@@ -40,13 +41,14 @@ export const fuColorClass = (s: FollowUpStatus): string =>
 
 export function FollowUpsView({
   db,
+  session,
   searchQuery,
   onUpdateDatabase,
   onToast,
   onAskConfirm,
   onBookShootForOwner
 }: FollowUpsViewProps) {
-  const [activeTab, setActiveTab] = useState<'tracker' | 'owners'>('tracker');
+  const [activeTab, setActiveTab] = useState<'tracker' | 'owners' | 'notes'>('tracker');
 
   // FollowUp Modal State
   const [editingFU, setEditingFU] = useState<FollowUp | null>(null);
@@ -59,10 +61,13 @@ export function FollowUpsView({
   const [fStatus, setFStatus] = useState<FollowUpStatus>('New lead');
   const [fNext, setFNext] = useState(dOff(3));
   const [fAction, setFAction] = useState('');
-
-  // Owner Modal State
   const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
+
+  // Operator Note State
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteDesc, setNoteDesc] = useState('');
   const [oName, setOName] = useState('');
   const [oPhone, setOPhone] = useState('');
   const [oNotes, setONotes] = useState('');
@@ -212,14 +217,41 @@ export function FollowUpsView({
     });
   };
 
+  const handleSaveNote = () => {
+    if (!noteTitle.trim() || !noteDesc.trim()) {
+      return onToast('Title and description are required for operator note.', true);
+    }
+    onUpdateDatabase(draft => {
+      if (!draft.operatorNotes) draft.operatorNotes = [];
+      draft.operatorNotes.unshift({
+        id: uid(),
+        title: noteTitle.trim(),
+        description: noteDesc.trim(),
+        date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        operator: session.name
+      });
+      draft.activity.unshift({
+        ts: Date.now(),
+        text: `Operator Note recorded by ${session.name}: "${noteTitle.trim()}"`
+      });
+    });
+    setIsNoteModalOpen(false);
+    setNoteTitle('');
+    setNoteDesc('');
+    onToast('Operator note recorded ✓');
+  };
+
   return (
     <section className="view on" id="view-followups">
       <div className="pagehead rise">
         <div>
-          <div className="ph-title">Building Owner Follow-Ups</div>
-          <div className="ph-sub">Status, outcomes and next steps — no lead gets lost</div>
+          <div className="ph-title">Building Owner Follow-Ups & Operator Notes</div>
+          <div className="ph-sub">Status, outcomes, next steps, and call center operator shift notes</div>
         </div>
         <div className="ph-actions">
+          <button className="btn btn-gold" onClick={() => setIsNoteModalOpen(true)}>
+            📝 Add Quick Note
+          </button>
           <button className="btn btn-ghost" onClick={() => exportCSV('followups', db)}>
             ⇩ Export CSV
           </button>
@@ -238,6 +270,9 @@ export function FollowUpsView({
         </button>
         <button className={activeTab === 'owners' ? 'on' : ''} onClick={() => setActiveTab('owners')}>
           Owners Directory
+        </button>
+        <button className={activeTab === 'notes' ? 'on' : ''} onClick={() => setActiveTab('notes')}>
+          Operator Quick Notes ({db.operatorNotes?.length || 0})
         </button>
       </div>
 
@@ -327,7 +362,7 @@ export function FollowUpsView({
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'owners' ? (
         <div id="fuOwners">
           <div className="card rise">
             <div className="tblwrap">
@@ -380,12 +415,102 @@ export function FollowUpsView({
             </div>
           </div>
         </div>
-      )}
+      ) : activeTab === 'notes' ? (
+        <div id="fuNotes">
+          <div className="card rise" style={{ animationDelay: '.1s' }}>
+            <div className="card-h">
+              <h3>📝 Call Center Operator Notes Feed</h3>
+              <div className="spacer" />
+              <button className="btn btn-gold btn-sm" onClick={() => setIsNoteModalOpen(true)}>
+                ＋ New Note
+              </button>
+            </div>
+            <div className="card-b">
+              {db.operatorNotes?.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {db.operatorNotes.map(n => (
+                    <div
+                      key={n.id}
+                      style={{
+                        background: 'var(--cream2)',
+                        padding: '14px 18px',
+                        borderRadius: '10px',
+                        border: '1px solid var(--sageline)',
+                        borderLeft: '4px solid var(--gold)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <b style={{ fontSize: '15px', color: 'var(--pine)' }}>{n.title}</b>
+                        <span className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                          📅 {n.date} · 👤 {n.operator}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '13.5px', color: 'var(--ink)', margin: 0, whiteSpace: 'pre-wrap' }}>
+                        {n.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty">
+                  <p>No operator quick notes recorded yet. Click "Add Quick Note" to log shift notes.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Operator Note Modal */}
+      <Modal
+        isOpen={isNoteModalOpen}
+        title="Add Call Center Operator Quick Note"
+        onClose={() => setIsNoteModalOpen(false)}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setIsNoteModalOpen(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-gold" onClick={handleSaveNote}>
+              Save Note
+            </button>
+          </>
+        }
+      >
+        <div className="fgrid">
+          <div className="fld full">
+            <label>Note Title *</label>
+            <input
+              className="inp"
+              value={noteTitle}
+              onChange={e => setNoteTitle(e.target.value)}
+              placeholder="e.g. Shift Update — Owner pricing agreement for Bole"
+            />
+          </div>
+
+          <div className="fld full">
+            <label>Description / Note Content *</label>
+            <textarea
+              className="inp"
+              rows={4}
+              value={noteDesc}
+              onChange={e => setNoteDesc(e.target.value)}
+              placeholder="Enter detailed shift notes, call summary, or property instructions..."
+            />
+          </div>
+
+          <div className="fld full">
+            <div style={{ fontSize: '12px', color: 'var(--muted)', background: 'var(--cream2)', padding: '10px', borderRadius: '8px' }}>
+              ℹ Timestamp & Operator Name (<b>{session.name}</b>) will be automatically registered upon saving.
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Follow-Up Modal */}
       <Modal
         isOpen={isFUModalOpen}
-        title={editingFU ? 'Edit Follow-Up' : 'New Owner Follow-Up'}
+        title={editingFU ? 'Edit Follow-Up' : 'Log Follow-Up Action'}
         onClose={() => setIsFUModalOpen(false)}
         footer={
           <>
@@ -393,7 +518,7 @@ export function FollowUpsView({
               Cancel
             </button>
             <button className="btn btn-pri" onClick={handleSaveFU}>
-              Save Follow-Up
+              Save
             </button>
           </>
         }
@@ -477,11 +602,11 @@ export function FollowUpsView({
           </div>
           <div className="fld">
             <label>Phone *</label>
-            <input className="inp mono" value={oPhone} onChange={e => setOPhone(e.target.value)} />
+            <input className="inp mono" value={oPhone} onChange={e => setOPhone(e.target.value)} placeholder="+251 9…" />
           </div>
           <div className="fld full">
-            <label>Notes</label>
-            <textarea className="inp" value={oNotes} onChange={e => setONotes(e.target.value)} />
+            <label>Notes / Portfolio overview</label>
+            <textarea className="inp" value={oNotes} onChange={e => setONotes(e.target.value)} placeholder="Properties owned, preferred terms…" />
           </div>
         </div>
       </Modal>

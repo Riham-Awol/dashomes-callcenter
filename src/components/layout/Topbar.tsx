@@ -87,9 +87,11 @@ export function Topbar({ db, session, currentView, searchQuery, onSearchChange, 
         {isSupabaseConfigured() ? '☁ Supabase Cloud' : '💾 Local Storage'}
       </div>
 
-      <button className="btn btn-gold" onClick={onNewAppointment}>
-        ＋ New Appointment
-      </button>
+      {['System Administrator', 'Call Center Operator'].includes(session.role) && (
+        <button className="btn btn-gold" onClick={onNewAppointment}>
+          ＋ New Appointment
+        </button>
+      )}
     </header>
   );
 }

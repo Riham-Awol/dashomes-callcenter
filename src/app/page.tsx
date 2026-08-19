@@ -202,6 +202,7 @@ export default function Home() {
               }}
               onUpdateDatabase={updateDatabase}
               onToast={showToast}
+              onAskConfirm={askConfirm}
             />
           )}
 
@@ -250,6 +251,7 @@ export default function Home() {
           {currentView === 'followups' && (
             <FollowUpsView
               db={db}
+              session={session}
               searchQuery={searchQuery}
               onUpdateDatabase={updateDatabase}
               onToast={showToast}

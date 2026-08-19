@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { DatabaseSchema } from '@/types';
+import { BOLE_PINNED_LOCATIONS } from '@/lib/pinnedLocations';
+import { isToday } from '@/lib/utils';
 
 const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: false });
 
@@ -11,12 +13,13 @@ interface MapViewProps {
 }
 
 export function MapView({ db }: MapViewProps) {
-  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property']));
+  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property', 'pinned']));
   const [teams, setTeams] = useState<Set<string>>(() => {
     const s = new Set(db.teams.map(t => t.id));
     s.add('unassigned');
     return s;
   });
+  const [showTodayOnly, setShowTodayOnly] = useState(false);
 
   const toggleType = (k: string) => {
     setTypes(prev => {
@@ -36,12 +39,39 @@ export function MapView({ db }: MapViewProps) {
     });
   };
 
+  // Build pinned location markers as pseudo-appointments for LeafletMap
+  const pinnedAsAppointments = types.has('pinned')
+    ? BOLE_PINNED_LOCATIONS.map(pin => ({
+        id: pin.id,
+        name: pin.name,
+        address: `${pin.area}, Bole Subcity`,
+        kind: 'owner' as const,
+        dt: new Date().toISOString(),
+        status: 'Scheduled' as const,
+        teamId: '',
+        phone: '',
+        lat: pin.lat,
+        lng: pin.lng,
+        isPinned: true,
+        contactId: '',
+        propId: '',
+        notes: ''
+      }))
+    : [];
+
+  // Filter appointments: optionally show only today's scheduled
+  const filteredAppointments = showTodayOnly
+    ? db.appointments.filter(a => isToday(a.dt))
+    : db.appointments;
+
+  const allAppointments = [...filteredAppointments, ...pinnedAsAppointments];
+
   return (
     <section className="view on" id="view-map">
       <div className="pagehead rise">
         <div>
           <div className="ph-title">Field Map</div>
-          <div className="ph-sub">Pins colored by camera / sales team · diamonds are registered properties</div>
+          <div className="ph-sub">Pins colored by camera / sales team · diamonds are registered properties · 📌 pinned from Bole gazetteer</div>
         </div>
       </div>
 
@@ -49,7 +79,8 @@ export function MapView({ db }: MapViewProps) {
         {[
           ['broker', 'Broker shoots'],
           ['owner', 'Owner visits'],
-          ['property', 'Properties']
+          ['property', 'Properties'],
+          ['pinned', '📌 Pinned Locations']
         ].map(([k, l]) => (
           <button
             key={k}
@@ -59,13 +90,20 @@ export function MapView({ db }: MapViewProps) {
             {l}
           </button>
         ))}
+        <button
+          className={`fchip ${showTodayOnly ? 'on' : ''}`}
+          onClick={() => setShowTodayOnly(prev => !prev)}
+          style={{ borderColor: showTodayOnly ? 'var(--gold)' : undefined, color: showTodayOnly ? 'var(--gold)' : undefined }}
+        >
+          📅 Today's Schedule Only
+        </button>
         <span className="chip ch-gray">tiles need internet · pins & scheduling work offline</span>
       </div>
 
       <div className="mapshell rise" style={{ animationDelay: '.1s' }}>
         <div id="bigMap">
           <LeafletMap
-            appointments={db.appointments}
+            appointments={allAppointments}
             properties={db.properties}
             teams={db.teams}
             filterTypes={types}
@@ -135,6 +173,18 @@ export function MapView({ db }: MapViewProps) {
               }}
             />
             Registered property
+          </div>
+          <div className="lg-item" style={{ cursor: 'default' }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#0288D1',
+              }}
+            />
+            📌 Pinned (Bole gazetteer)
           </div>
         </div>
       </div>
