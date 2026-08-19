@@ -27,7 +27,7 @@ export function Modal({ isOpen, title, onClose, wide = false, children, footer }
 
   return (
     <div id="modalRoot">
-      <div className="veil" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="veil modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className={`modal ${wide ? 'wide' : ''}`}>
           <div className="modal-h">
             <h3>{title}</h3>
@@ -55,9 +55,9 @@ export function AskConfirmModal({ isOpen, message, onConfirm, onCancel }: AskCon
 
   return (
     <div id="modalRoot">
-      <div className="veil" onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}>
-        <div className="modal" style={{ width: 'min(400px, 100%)' }}>
-          <div className="modal-b" style={{ textAlign: 'center', padding: '30px', overflow: 'visible' }}>
+      <div className="veil modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}>
+        <div className="modal" style={{ width: 'min(400px, 94vw)' }}>
+          <div className="modal-b" style={{ textAlign: 'center', padding: '24px 20px', overflow: 'visible' }}>
             <div style={{ color: 'var(--clay)', marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
               <Icon name="alert" size={38} />
             </div>
