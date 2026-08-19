@@ -51,6 +51,15 @@ export default function Home() {
     });
   }, []);
 
+  useEffect(() => {
+    if (session?.role === 'Property & Broker Manager') {
+      const allowedViews: ViewId[] = ['brokers', 'properties', 'teams', 'schedule', 'analytics'];
+      if (!allowedViews.includes(currentView)) {
+        setCurrentView('brokers');
+      }
+    }
+  }, [session, currentView]);
+
   const showToast = (msg: string, isError = false) => {
     const id = Math.random().toString(36).slice(2);
     const newToast: ToastMessage = { id, msg, isError };
@@ -75,7 +84,13 @@ export default function Home() {
   const handleLogin = (newSession: Session) => {
     saveSession(newSession);
     setSession(newSession);
-    setCurrentView('dashboard');
+    if (newSession.role === 'Property & Broker Manager') {
+      setCurrentView('brokers');
+    } else if (newSession.role === 'Team Member (Field Agent)') {
+      setCurrentView('schedule');
+    } else {
+      setCurrentView('dashboard');
+    }
     showToast(`Welcome to the desk, ${newSession.name.split(' ')[0]} ☎`);
   };
 
