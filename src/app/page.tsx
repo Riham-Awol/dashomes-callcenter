@@ -203,6 +203,7 @@ export default function Home() {
               onUpdateDatabase={updateDatabase}
               onToast={showToast}
               onAskConfirm={askConfirm}
+              onNavigateMap={() => setCurrentView('map')}
             />
           )}
 

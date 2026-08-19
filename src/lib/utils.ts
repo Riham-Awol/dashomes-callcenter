@@ -263,6 +263,11 @@ export interface TeamDaily15Route {
     lng?: number | null;
     time?: string;
     status?: string;
+    phone?: string;
+    notes?: string;
+    contactName?: string;
+    incompletionReason?: string;
+    originalAppointment?: Appointment;
   }[];
 }
 
@@ -288,7 +293,12 @@ export function generateTeamDaily15Routes(
       lat: a.lat,
       lng: a.lng,
       time: a.dt ? fmtTime(a.dt) : '10:00 AM',
-      status: a.status
+      status: a.status,
+      phone: a.phone || '+251 91 122 3344',
+      notes: a.notes || `${a.kind === 'broker' ? 'Broker photo shoot' : 'Owner building visit'} & property intake`,
+      contactName: a.name,
+      incompletionReason: a.incompletionReason,
+      originalAppointment: a
     }));
 
     // Step 1: Fill with approved properties if bookings < 15
@@ -308,7 +318,10 @@ export function generateTeamDaily15Routes(
           lat: pr.lat,
           lng: pr.lng,
           time: `${9 + (i % 8)}:00 AM`,
-          status: 'Scheduled'
+          status: 'Scheduled',
+          phone: pr.phone || '+251 91 234 5678',
+          notes: pr.notes || 'Approved property intake & media capture',
+          contactName: pr.owner || pr.name
         });
       }
     }
@@ -329,7 +342,10 @@ export function generateTeamDaily15Routes(
           lat: pin.lat,
           lng: pin.lng,
           time: `${9 + (i % 8)}:${i % 2 === 0 ? '00' : '30'} AM`,
-          status: 'Scheduled'
+          status: 'Scheduled',
+          phone: '+251 91 555 7788',
+          notes: `Bole Area pinned location survey & property photo shoot (${pin.area})`,
+          contactName: pin.name
         });
       }
     }
