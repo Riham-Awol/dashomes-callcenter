@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { DatabaseSchema } from '@/types';
+import { DatabaseSchema, Session } from '@/types';
 import { BOLE_PINNED_LOCATIONS } from '@/lib/pinnedLocations';
 import { isToday } from '@/lib/utils';
 
@@ -10,16 +10,39 @@ const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: 
 
 interface MapViewProps {
   db: DatabaseSchema;
+  session?: Session | null;
+  focusedLocation?: { lat: number; lng: number; address?: string } | null;
 }
 
-export function MapView({ db }: MapViewProps) {
+export function MapView({ db, session, focusedLocation }: MapViewProps) {
   const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property', 'pinned']));
+
+  const isFieldAgent = session?.role === 'Team Member (Field Agent)';
+
+  // Find logged in team if field agent
+  const userTeam = db.teams.find(
+    t =>
+      (session?.teamId && t.id === session.teamId) ||
+      t.name.toLowerCase() === session?.name?.toLowerCase() ||
+      session?.u?.toLowerCase().includes(t.id.toLowerCase()) ||
+      (session?.u === 'team1' && t.id === 't1') ||
+      (session?.u === 'team2' && t.id === 't2') ||
+      (session?.u === 'team3' && t.id === 't3') ||
+      (session?.u === 'team4' && t.id === 't4') ||
+      t.members?.some(m => m.name === session?.name)
+  );
+
   const [teams, setTeams] = useState<Set<string>>(() => {
+    if (isFieldAgent && userTeam) {
+      return new Set([userTeam.id]);
+    }
     const s = new Set(db.teams.map(t => t.id));
     s.add('unassigned');
     return s;
   });
-  const [showTodayOnly, setShowTodayOnly] = useState(false);
+
+  const [showTodayOnly, setShowTodayOnly] = useState(isFieldAgent);
+  const [drawRoutePath, setDrawRoutePath] = useState(true);
 
   const toggleType = (k: string) => {
     setTypes(prev => {
@@ -31,6 +54,7 @@ export function MapView({ db }: MapViewProps) {
   };
 
   const toggleTeam = (k: string) => {
+    if (isFieldAgent) return; // Field agents locked to their own team
     setTeams(prev => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
@@ -48,7 +72,7 @@ export function MapView({ db }: MapViewProps) {
         kind: 'owner' as const,
         dt: new Date().toISOString(),
         status: 'Scheduled' as const,
-        teamId: '',
+        teamId: isFieldAgent && userTeam ? userTeam.id : '',
         phone: '',
         lat: pin.lat,
         lng: pin.lng,
@@ -59,10 +83,14 @@ export function MapView({ db }: MapViewProps) {
       }))
     : [];
 
-  // Filter appointments: optionally show only today's scheduled
-  const filteredAppointments = showTodayOnly
+  // Filter appointments: optionally show only today's scheduled, and filter by team for field agents
+  let filteredAppointments = showTodayOnly
     ? db.appointments.filter(a => isToday(a.dt))
     : db.appointments;
+
+  if (isFieldAgent && userTeam) {
+    filteredAppointments = filteredAppointments.filter(a => a.teamId === userTeam.id);
+  }
 
   const allAppointments = [...filteredAppointments, ...pinnedAsAppointments];
 
@@ -70,8 +98,14 @@ export function MapView({ db }: MapViewProps) {
     <section className="view on" id="view-map">
       <div className="pagehead rise">
         <div>
-          <div className="ph-title">Field Map</div>
-          <div className="ph-sub">Pins colored by camera / sales team · diamonds are registered properties · 📌 pinned from Bole gazetteer</div>
+          <div className="ph-title">
+            {isFieldAgent && userTeam ? `🚗 ${userTeam.name} — Field Map` : 'Field Map'}
+          </div>
+          <div className="ph-sub">
+            {isFieldAgent && userTeam
+              ? `Displaying pins & daily shortest route path for ${userTeam.name} only.`
+              : 'Pins colored by team · numbered sequence shows shortest route connecting all scheduled stops'}
+          </div>
         </div>
       </div>
 
@@ -90,6 +124,7 @@ export function MapView({ db }: MapViewProps) {
             {l}
           </button>
         ))}
+
         <button
           className={`fchip ${showTodayOnly ? 'on' : ''}`}
           onClick={() => setShowTodayOnly(prev => !prev)}
@@ -97,6 +132,15 @@ export function MapView({ db }: MapViewProps) {
         >
           📅 Today's Schedule Only
         </button>
+
+        <button
+          className={`fchip ${drawRoutePath ? 'on' : ''}`}
+          onClick={() => setDrawRoutePath(prev => !prev)}
+          style={{ borderColor: drawRoutePath ? '#2E4632' : undefined, color: drawRoutePath ? '#2E4632' : undefined }}
+        >
+          🛣️ Shortest Daily Route Path
+        </button>
+
         <span className="chip ch-gray">tiles need internet · pins & scheduling work offline</span>
       </div>
 
@@ -108,16 +152,38 @@ export function MapView({ db }: MapViewProps) {
             teams={db.teams}
             filterTypes={types}
             filterTeams={teams}
+            focusedLocation={focusedLocation}
+            drawRoutePath={drawRoutePath}
           />
         </div>
 
         <div className="maplegend" id="mapLegend">
-          <h4>Teams (click to toggle)</h4>
-          {db.teams.map(t => (
+          <h4>{isFieldAgent ? 'Your Active Team' : 'Teams (click to toggle)'}</h4>
+          {db.teams
+            .filter(t => !isFieldAgent || (userTeam && t.id === userTeam.id))
+            .map(t => (
+              <div
+                key={t.id}
+                className={`lg-item ${!teams.has(t.id) ? 'off' : ''}`}
+                onClick={() => toggleTeam(t.id)}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: t.color
+                  }}
+                />
+                {t.name}
+              </div>
+            ))}
+
+          {!isFieldAgent && (
             <div
-              key={t.id}
-              className={`lg-item ${!teams.has(t.id) ? 'off' : ''}`}
-              onClick={() => toggleTeam(t.id)}
+              className={`lg-item ${!teams.has('unassigned') ? 'off' : ''}`}
+              onClick={() => toggleTeam('unassigned')}
             >
               <span
                 style={{
@@ -125,29 +191,27 @@ export function MapView({ db }: MapViewProps) {
                   width: '10px',
                   height: '10px',
                   borderRadius: '50%',
-                  background: t.color
+                  background: '#9AA392'
                 }}
               />
-              {t.name}
+              Unassigned
             </div>
-          ))}
-          <div
-            className={`lg-item ${!teams.has('unassigned') ? 'off' : ''}`}
-            onClick={() => toggleTeam('unassigned')}
-          >
+          )}
+
+          <h4>Route & Shapes</h4>
+          <div className="lg-item" style={{ cursor: 'default' }}>
             <span
               style={{
                 display: 'inline-block',
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: '#9AA392'
+                width: '18px',
+                height: '3px',
+                background: '#B8860B',
+                borderRadius: '2px',
+                marginRight: '6px'
               }}
             />
-            Unassigned
+            Shortest Daily Route (1→15)
           </div>
-
-          <h4>Shapes</h4>
           <div className="lg-item" style={{ cursor: 'default' }}>
             <span
               style={{
@@ -181,7 +245,7 @@ export function MapView({ db }: MapViewProps) {
                 width: '10px',
                 height: '10px',
                 borderRadius: '50%',
-                background: '#0288D1',
+                background: '#0288D1'
               }}
             />
             📌 Pinned (Bole gazetteer)

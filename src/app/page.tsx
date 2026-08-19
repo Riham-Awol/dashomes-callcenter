@@ -40,6 +40,18 @@ export default function Home() {
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
   const [apptPrefill, setApptPrefill] = useState<Partial<Appointment> | null>(null);
 
+  // Map Redirection & Focus State
+  const [focusedMapLocation, setFocusedMapLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+
+  const handleNavigateMap = (lat?: number | null, lng?: number | null, address?: string) => {
+    if (lat != null && lng != null) {
+      setFocusedMapLocation({ lat, lng, address });
+    } else {
+      setFocusedMapLocation(null);
+    }
+    setCurrentView('map');
+  };
+
   useEffect(() => {
     // Initial sync with local storage
     setDb(loadDatabase());
@@ -203,11 +215,11 @@ export default function Home() {
               onUpdateDatabase={updateDatabase}
               onToast={showToast}
               onAskConfirm={askConfirm}
-              onNavigateMap={() => setCurrentView('map')}
+              onNavigateMap={handleNavigateMap}
             />
           )}
 
-          {currentView === 'map' && <MapView db={db} />}
+          {currentView === 'map' && <MapView db={db} session={session} focusedLocation={focusedMapLocation} />}
 
           {currentView === 'brokers' && (
             <BrokersView

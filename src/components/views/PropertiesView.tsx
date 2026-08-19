@@ -254,12 +254,32 @@ export function PropertiesView({
     exportToWordDoc('Das Homes Property Listings Report', cols, rows, 'dashomes-properties-report');
   };
 
+  const handlePinCurrentLocation = () => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      onToast('Requesting current GPS coordinates...');
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          onToast(`Current location pinned: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} ✓`);
+        },
+        () => {
+          setPin({ lat: 9.0055, lng: 38.7830 });
+          onToast('Pinned Bole Subcity area center (9.0055, 38.7830) ✓');
+        },
+        { timeout: 8000 }
+      );
+    } else {
+      setPin({ lat: 9.0055, lng: 38.7830 });
+      onToast('Pinned Bole Subcity area center (9.0055, 38.7830) ✓');
+    }
+  };
+
   return (
     <section className="view on" id="view-properties">
       <div className="pagehead rise">
         <div>
-          <div className="ph-title">Property Registry</div>
-          <div className="ph-sub">Approved listings are accessible to Call Center Operators</div>
+          <div className="ph-title">Properties Intake & Inventory</div>
+          <div className="ph-sub">Manage registered real estate listings, approval workflow, and team assignments</div>
         </div>
         <div className="ph-actions">
           <button className="btn btn-ghost" onClick={handleExportWord} title="Export Word Document">
@@ -267,6 +287,9 @@ export function PropertiesView({
           </button>
           <button className="btn btn-ghost" onClick={() => exportCSV('properties', db)}>
             ⇩ Export CSV
+          </button>
+          <button className="btn btn-sec" onClick={handlePinCurrentLocation}>
+            📍 Pin Current Location
           </button>
           <button className="btn btn-pri" onClick={() => handleOpenForm(null)}>
             ＋ Register Property
@@ -653,7 +676,17 @@ export function PropertiesView({
           </div>
 
           <div className="fld full">
-            <label>Pin Location on Map</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ margin: 0 }}>Pin Location on Map</label>
+              <button
+                type="button"
+                className="btn btn-sm btn-gold"
+                onClick={handlePinCurrentLocation}
+                style={{ fontSize: '11px', padding: '4px 10px' }}
+              >
+                📍 Use Pin Current Location (GPS)
+              </button>
+            </div>
             <MapPinPicker initialPin={pin} onPinChange={newPin => setPin(newPin)} />
           </div>
 

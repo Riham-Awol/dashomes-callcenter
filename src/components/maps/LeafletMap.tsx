@@ -11,6 +11,8 @@ interface LeafletMapProps {
   isMiniMap?: boolean;
   filterTypes?: Set<string>;
   filterTeams?: Set<string>;
+  focusedLocation?: { lat: number; lng: number; label?: string } | null;
+  drawRoutePath?: boolean;
   onMapClick?: (lat: number, lng: number) => void;
 }
 
@@ -19,8 +21,10 @@ export default function LeafletMap({
   properties = [],
   teams = [],
   isMiniMap = false,
-  filterTypes = new Set(['broker', 'owner', 'property']),
+  filterTypes = new Set(['broker', 'owner', 'property', 'pinned']),
   filterTeams = new Set(),
+  focusedLocation,
+  drawRoutePath = true,
   onMapClick
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,7 +33,18 @@ export default function LeafletMap({
 
   const teamById = (id: string) => teams.find(t => t.id === id);
 
-  function createPinIcon(L: any, color: string, kind: 'home' | 'cam') {
+  function createPinIcon(L: any, color: string, kind: 'home' | 'cam' | 'num', numStr?: string) {
+    if (kind === 'num') {
+      const html = `<div style="background:${color};color:#fff;font-weight:800;font-size:12px;font-family:sans-serif;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${numStr}</div>`;
+      return L.divIcon({
+        className: '',
+        html,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+      });
+    }
+
     const glyph =
       kind === 'home'
         ? `<path d="M9.5 14.8v-4.2l3.5-2.9 3.5 2.9v4.2h-2.5v-2.6h-2v2.6z" fill="#fff"/>`
@@ -50,19 +65,67 @@ export default function LeafletMap({
 
   function popAppt(a: Appointment) {
     const t = teamById(a.teamId);
-    return `<div class="pop-t">${a.address}</div><div class="pop-m">${fmtDT(a.dt)}</div>
-    <div style="margin-top:6px">${a.name} · <span class="src-chip ${a.kind === 'broker' ? 'src-broker' : 'src-owner'}">${a.kind}</span></div>
-    <div style="margin-top:5px"><span class="team-dot" style="background:${t ? t.color : '#9AA392'}"></span><b>${t ? t.name : 'Unassigned'}</b>${t ? ` — ${t.lead}` : ''}</div>
-    <div style="margin-top:4px"><span class="chip s-${a.status}" style="border:none">${a.status}</span></div>
-    ${a.notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">${a.notes}</div>` : ''}`;
+    const title = a.name || 'Scheduled Visit';
+    const addr = a.address || 'Location Pinned';
+    const kind = a.kind || 'owner';
+    const dtStr = a.dt ? fmtDT(a.dt) : '10:00 AM';
+    const status = a.status || 'Scheduled';
+    const notes = a.notes || '';
+
+    return `<div class="pop-t">${addr}</div>
+    <div class="pop-m">${dtStr}</div>
+    <div style="margin-top:6px"><b>${title}</b> · <span class="src-chip ${kind === 'broker' ? 'src-broker' : 'src-owner'}">${kind}</span></div>
+    <div style="margin-top:5px"><span class="team-dot" style="background:${t ? t.color : '#9AA392'}"></span><b>${t ? t.name : 'Unassigned'}</b></div>
+    <div style="margin-top:4px"><span class="chip s-${status}" style="border:none">${status}</span></div>
+    ${notes ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic">${notes}</div>` : ''}`;
   }
 
   function popProp(p: Property) {
-    return `<div class="pop-t">${p.name}</div><div class="pop-m">${p.address}</div>
-    <div style="margin-top:6px"><span class="chip ${p.listing === 'sale' ? 'ch-gold' : 'ch-sage'}" style="border:none">${p.listing}</span>
-    <span class="chip ch-blue" style="border:none">${p.type}</span> ${p.furnished ? '<span class="chip ch-gray" style="border:none">furnished</span>' : ''}</div>
-    <div style="margin-top:6px;font:700 15px Fraunces;color:var(--gold)">${fmtMoney(p.price)}${p.listing === 'rent' ? '<small style="font:600 10px Karla;color:var(--muted)"> /mo</small>' : ''}</div>
-    <div style="margin-top:4px;font:500 11px \'IBM Plex Mono\';color:var(--muted)">${p.owner} · ${p.phone}</div>`;
+    const name = p.name || 'Registered Property';
+    const addr = p.address || 'Location Pinned';
+    const listing = p.listing || 'rent';
+    const type = p.type || 'Property';
+    const priceStr = p.price != null ? fmtMoney(p.price) : 'Contact Agent';
+    const owner = p.owner || 'Registered Owner';
+    const phone = p.phone || '';
+
+    return `<div class="pop-t">${name}</div>
+    <div class="pop-m">${addr}</div>
+    <div style="margin-top:6px">
+      <span class="chip ${listing === 'sale' ? 'ch-gold' : 'ch-sage'}" style="border:none">${listing}</span>
+      <span class="chip ch-blue" style="border:none">${type}</span>
+      ${p.furnished ? '<span class="chip ch-gray" style="border:none">furnished</span>' : ''}
+    </div>
+    <div style="margin-top:6px;font:700 15px Fraunces;color:var(--gold)">
+      ${priceStr}${listing === 'rent' ? '<small style="font:600 10px Karla;color:var(--muted)"> /mo</small>' : ''}
+    </div>
+    <div style="margin-top:4px;font:500 11px \'IBM Plex Mono\';color:var(--muted)">${owner}${phone ? ' · ' + phone : ''}</div>`;
+  }
+
+  // Nearest-Neighbor Shortest Path TSP algorithm for connecting daily stops
+  function computeShortestRoute(points: { lat: number; lng: number; title: string }[]) {
+    if (points.length < 2) return points;
+
+    const unvisited = [...points];
+    const route = [unvisited.shift()!];
+
+    while (unvisited.length > 0) {
+      const current = route[route.length - 1];
+      let nearestIdx = 0;
+      let minDistance = Infinity;
+
+      for (let i = 0; i < unvisited.length; i++) {
+        const d = Math.hypot(unvisited[i].lat - current.lat, unvisited[i].lng - current.lng);
+        if (d < minDistance) {
+          minDistance = d;
+          nearestIdx = i;
+        }
+      }
+
+      route.push(unvisited.splice(nearestIdx, 1)[0]);
+    }
+
+    return route;
   }
 
   useEffect(() => {
@@ -80,7 +143,11 @@ export default function LeafletMap({
           ? { zoomControl: false, scrollWheelZoom: false }
           : { zoomControl: true };
 
-        const map = L.map(containerRef.current, mapOptions).setView([9.005, 38.79], 12);
+        const initialLat = focusedLocation?.lat || 9.005;
+        const initialLng = focusedLocation?.lng || 38.79;
+        const initialZoom = focusedLocation ? 16 : 12;
+
+        const map = L.map(containerRef.current, mapOptions).setView([initialLat, initialLng], initialZoom);
 
         // Tile layer with fallback
         const TILES = [
@@ -110,13 +177,19 @@ export default function LeafletMap({
         }
       }
 
-      // Update pins
+      // Update pins and routes
       const map = mapInstanceRef.current;
       const layerGroup = layerGroupRef.current;
       if (!map || !layerGroup) return;
 
       layerGroup.clearLayers();
       const pts: [number, number][] = [];
+      const routePoints: { lat: number; lng: number; title: string; color?: string }[] = [];
+
+      // If redirected to a focused location, center map exactly there
+      if (focusedLocation && focusedLocation.lat != null && focusedLocation.lng != null) {
+        map.setView([focusedLocation.lat, focusedLocation.lng], 16, { animate: true });
+      }
 
       appointments.forEach(a => {
         if (!isMiniMap && !filterTypes.has(a.kind)) return;
@@ -124,10 +197,17 @@ export default function LeafletMap({
         if (!isMiniMap && filterTeams.size > 0 && !filterTeams.has(tk)) return;
         if (a.lat != null && a.lng != null) {
           const t = teamById(a.teamId);
-          const icon = createPinIcon(L, t?.color || '#9AA392', 'cam');
+          const pinColor = t?.color || '#0288D1';
+          const icon = createPinIcon(L, pinColor, 'cam');
           const marker = L.marker([a.lat, a.lng], { icon }).bindPopup(popAppt(a));
           layerGroup.addLayer(marker);
+
+          if (focusedLocation && Math.abs(a.lat - focusedLocation.lat) < 0.0001 && Math.abs(a.lng - focusedLocation.lng) < 0.0001) {
+            marker.openPopup();
+          }
+
           pts.push([a.lat, a.lng]);
+          routePoints.push({ lat: a.lat, lng: a.lng, title: a.name || a.address, color: pinColor });
         }
       });
 
@@ -137,11 +217,41 @@ export default function LeafletMap({
           const icon = createPinIcon(L, '#8C6A1F', 'home');
           const marker = L.marker([p.lat, p.lng], { icon }).bindPopup(popProp(p));
           layerGroup.addLayer(marker);
+
+          if (focusedLocation && Math.abs(p.lat - focusedLocation.lat) < 0.0001 && Math.abs(p.lng - focusedLocation.lng) < 0.0001) {
+            marker.openPopup();
+          }
+
           pts.push([p.lat, p.lng]);
         }
       });
 
-      if (pts.length > 0) {
+      // Draw Shortest Route Path (TSP sequence) for scheduled day visits
+      if (drawRoutePath && routePoints.length >= 2) {
+        const sortedRoute = computeShortestRoute(routePoints);
+        const latLngs: [number, number][] = sortedRoute.map(pt => [pt.lat, pt.lng]);
+
+        // Draw polyline connecting all visits in shortest order
+        const polyline = L.polyline(latLngs, {
+          color: '#B8860B',
+          weight: 4.5,
+          opacity: 0.85,
+          dashArray: '8, 10',
+          lineCap: 'round'
+        });
+        layerGroup.addLayer(polyline);
+
+        // Render sequence numbers (1, 2, 3... N) along the path
+        sortedRoute.forEach((pt, idx) => {
+          const numIcon = createPinIcon(L, '#2E4632', 'num', String(idx + 1));
+          const numMarker = L.marker([pt.lat, pt.lng], { icon: numIcon }).bindPopup(
+            `<b>Stop #${idx + 1}</b><br/>${pt.title}`
+          );
+          layerGroup.addLayer(numMarker);
+        });
+      }
+
+      if (!focusedLocation && pts.length > 0) {
         map.fitBounds(pts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
       }
 
@@ -153,7 +263,7 @@ export default function LeafletMap({
     return () => {
       isMounted = false;
     };
-  }, [appointments, properties, teams, isMiniMap, filterTypes, filterTeams]);
+  }, [appointments, properties, teams, isMiniMap, filterTypes, filterTeams, focusedLocation, drawRoutePath]);
 
   useEffect(() => {
     return () => {

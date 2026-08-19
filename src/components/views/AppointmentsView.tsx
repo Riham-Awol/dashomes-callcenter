@@ -215,6 +215,17 @@ export function AppointmentsView({
     exportToWordDoc('Das Homes Appointments & Shoot Schedule Report', cols, rows, 'dashomes-appointments-report');
   };
 
+  const handleFillDemo = () => {
+    setKind('broker');
+    setName('Wondwossen Tadesse');
+    setPhone('+251 91 888 4455');
+    setAddress('Bole Atlas, Near Friendship Hotel, Addis Ababa');
+    setNotes('Photo shoot for 3-bedroom luxury apartment + video walkthrough');
+    if (db.teams.length > 0) setTeamId(db.teams[0].id);
+    setPin({ lat: 9.0062, lng: 38.7845 });
+    onToast('Filled appointment form with demo data ✓');
+  };
+
   return (
     <section className="view on" id="view-appointments">
       <div className="pagehead rise">
@@ -378,6 +389,11 @@ export function AppointmentsView({
         wide
         footer={
           <>
+            {!editingAppt && (
+              <button className="btn btn-gold" type="button" onClick={handleFillDemo} style={{ marginRight: 'auto' }}>
+                ⚡ Auto-Fill Demo Data
+              </button>
+            )}
             <button className="btn btn-ghost" onClick={onCloseModal}>
               Cancel
             </button>
