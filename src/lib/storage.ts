@@ -304,11 +304,29 @@ export function loadDatabase(): DatabaseSchema {
 
 export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
   if (isSupabaseConfigured()) {
-    const remoteData = await fetchDatabaseFromSupabase();
-    if (remoteData && remoteData.users.length > 0) {
-      saveDatabase(remoteData);
-      return remoteData;
+    let remoteData = await fetchDatabaseFromSupabase();
+    const seed = getSeedData();
+
+    if (!remoteData || remoteData.users.length === 0) {
+      // Auto-seed Supabase Cloud database with default accounts and initial records
+      await saveDatabaseToSupabase(seed);
+      remoteData = seed;
+    } else {
+      // Ensure all seed accounts exist in remoteData
+      let seedUpdated = false;
+      seed.users.forEach(su => {
+        if (!remoteData!.users.some(u => u.u === su.u)) {
+          remoteData!.users.push(su);
+          seedUpdated = true;
+        }
+      });
+      if (seedUpdated) {
+        await saveDatabaseToSupabase(remoteData);
+      }
     }
+
+    saveDatabase(remoteData);
+    return remoteData;
   }
   return loadDatabase();
 }

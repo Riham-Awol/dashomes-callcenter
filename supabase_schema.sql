@@ -110,8 +110,13 @@ CREATE TABLE activity (
 
 -- Insert Demo Users
 INSERT INTO users (id, username, password, name, role, teamId, avatar) VALUES
-('u1', 'admin', 'dashomes', 'Selamawit D.', 'Call Center Manager', NULL, 'https://i.pravatar.cc/150?u=admin'),
-('u2', 'agent', 'dashomes', 'Front Desk', 'Operator', 'team_alpha', 'https://i.pravatar.cc/150?u=agent');
+('u1', 'admin', 'dashomes', 'Akrem Seud', 'System Administrator', NULL, NULL),
+('u2', 'manager', 'dashomes', 'Akrem Seud', 'Property & Broker Manager', NULL, NULL),
+('u3', 'agent', 'dashomes', 'Front Desk Operator', 'Call Center Operator', NULL, NULL),
+('u4', 'team1', 'dashomes', 'Team Falcon', 'Team Member (Field Agent)', 't1', NULL),
+('u5', 'team2', 'dashomes', 'Team Sheba', 'Team Member (Field Agent)', 't2', NULL),
+('u6', 'team3', 'dashomes', 'Team Blue Nile', 'Team Member (Field Agent)', 't3', NULL),
+('u7', 'team4', 'dashomes', 'Team Clay', 'Team Member (Field Agent)', 't4', NULL);
 
 -- Insert Demo Teams
 INSERT INTO teams (id, name, color, leader, members, target) VALUES
