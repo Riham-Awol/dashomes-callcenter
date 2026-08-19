@@ -2011,6 +2011,21 @@ textarea.inp {
   flex: 1 1 auto;
   max-height: calc(80vh - 110px);
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin !important;
+  scrollbar-color: var(--sage2) transparent !important;
+  -ms-overflow-style: auto !important;
+}
+.modal-b::-webkit-scrollbar {
+  display: block !important;
+  width: 6px !important;
+  height: 6px !important;
+}
+.modal-b::-webkit-scrollbar-thumb {
+  background: var(--sage2) !important;
+  border-radius: 10px !important;
+}
+.modal-b::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 .modal-f {
