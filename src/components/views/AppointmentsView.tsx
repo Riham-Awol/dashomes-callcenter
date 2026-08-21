@@ -40,7 +40,7 @@ export function AppointmentsView({
   const [name, setName] = useState(editingAppt?.name || prefillData?.name || '');
   const [phone, setPhone] = useState(editingAppt?.phone || prefillData?.phone || '');
   const [propId, setPropId] = useState(editingAppt?.propId || prefillData?.propId || '');
-  const [isShoot, setIsShoot] = useState<boolean>(editingAppt?.isShoot || prefillData?.isShoot || true);
+  const [isShoot, setIsShoot] = useState<boolean>(editingAppt?.isShoot ?? prefillData?.isShoot ?? true);
   const [dt, setDt] = useState<string>(() => {
     if (editingAppt?.dt) {
       const d = new Date(editingAppt.dt);

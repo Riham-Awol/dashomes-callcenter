@@ -242,17 +242,17 @@ export function getSeedData(): DatabaseSchema {
       }
     ],
     appointments: [
-      { id: 'a1', dt: dtOff(0, '10:00'), kind: 'broker', contactId: 'b1', name: 'Samuel Bekele', phone: '+251 91 123 4567', propId: '', address: 'Bole Near Olympia, Apartment 4B', teamId: 't1', status: 'Confirmed', notes: 'Key will be picked up at the gate; 3-bedroom unit.', lat: 9.0054, lng: 38.7700 },
-      { id: 'a2', dt: dtOff(0, '14:30'), kind: 'owner', contactId: 'o1', name: 'Ato Kebede', phone: '+251 91 234 5678', propId: 'p1', address: 'Summit Residential, Block C', teamId: 't2', status: 'Scheduled', notes: 'Owner wants courtyard shots too.', lat: 8.9990, lng: 38.8230 },
-      { id: 'a3', dt: dtOff(0, '16:15'), kind: 'broker', contactId: 'b2', name: 'Ruth Alemu', phone: '+251 92 456 7890', propId: '', address: 'Kazanchis Plaza, 7th floor', teamId: 't3', status: 'Confirmed', notes: '', lat: 9.0150, lng: 38.7610 },
-      { id: 'a4', dt: dtOff(1, '09:30'), kind: 'broker', contactId: 'b3', name: 'Bereket Tadesse', phone: '+251 91 888 2233', propId: 'p4', address: 'CMC Michael Park, Villa 12', teamId: 't1', status: 'Scheduled', notes: 'Gated community — call guard first.', lat: 9.0135, lng: 38.8345 },
-      { id: 'a5', dt: dtOff(1, '11:00'), kind: 'owner', contactId: 'o2', name: 'W/ro Almaz Tesfaye', phone: '+251 92 987 6543', propId: '', address: 'Megenagna Corner, Apt 2A', teamId: 't4', status: 'Scheduled', notes: '', lat: 9.0209, lng: 38.8010 },
-      { id: 'a6', dt: dtOff(2, '13:00'), kind: 'owner', contactId: 'o3', name: 'Ato Tadesse Worku', phone: '+251 91 445 2211', propId: 'p2', address: 'Bole Vista Townhouse 7', teamId: 't1', status: 'Scheduled', notes: 'Bring drone.', lat: 9.0080, lng: 38.8050 },
-      { id: 'a7', dt: dtOff(3, '10:30'), kind: 'broker', contactId: 'b6', name: 'Natnael Fikre', phone: '+251 91 605 3312', propId: 'p6', address: 'Ayat Real Estate, Villa 22', teamId: 't4', status: 'Scheduled', notes: '', lat: 9.0300, lng: 38.8600 },
-      { id: 'a8', dt: dtOff(-1, '10:00'), kind: 'broker', contactId: 'b4', name: 'Sara Mekonnen', phone: '+251 93 771 4455', propId: '', address: 'Piassa Heritage Row, Office 3', teamId: 't2', status: 'Completed', notes: 'Delivered 34 photos.', lat: 9.0350, lng: 38.7500 },
-      { id: 'a9', dt: dtOff(-1, '15:00'), kind: 'broker', contactId: 'b5', name: 'Lidiya Girma', phone: '+251 94 220 9081', propId: 'p5', address: 'Sarbet Sunflower, Apt 9C', teamId: 't3', status: 'Completed', notes: '', lat: 8.9910, lng: 38.7430 },
-      { id: 'a10', dt: dtOff(-3, '10:00'), kind: 'broker', contactId: 'b1', name: 'Samuel Bekele', phone: '+251 91 123 4567', propId: '', address: 'Gerji Imperial, Apt 5F', teamId: 't1', status: 'Completed', notes: '', lat: 8.9880, lng: 38.7900 },
-      { id: 'a11', dt: dtOff(-1, '09:00'), kind: 'broker', contactId: 'b7', name: 'Eyob Haile', phone: '+251 92 118 0094', propId: '', address: 'Kality Warehouse District', teamId: 't3', status: 'Cancelled', notes: 'Broker unreachable.', lat: 8.9170, lng: 38.7980 }
+      { id: 'a1', dt: dtOff(0, '10:00'), kind: 'broker', contactId: 'b1', name: 'Samuel Bekele', phone: '+251 91 123 4567', propId: '', address: 'Bole Near Olympia, Apartment 4B', teamId: 't1', status: 'Confirmed', notes: 'Key will be picked up at the gate; 3-bedroom unit.', lat: 9.0054, lng: 38.7700, isShoot: true },
+      { id: 'a2', dt: dtOff(0, '14:30'), kind: 'owner', contactId: 'o1', name: 'Ato Kebede', phone: '+251 91 234 5678', propId: 'p1', address: 'Summit Residential, Block C', teamId: 't2', status: 'Scheduled', notes: 'Owner wants courtyard shots too.', lat: 8.9990, lng: 38.8230, isShoot: false },
+      { id: 'a3', dt: dtOff(0, '16:15'), kind: 'broker', contactId: 'b2', name: 'Ruth Alemu', phone: '+251 92 456 7890', propId: '', address: 'Kazanchis Plaza, 7th floor', teamId: 't3', status: 'Confirmed', notes: 'Property intake and lifestyle photo set for listing rollout.', lat: 9.0150, lng: 38.7610, isShoot: true },
+      { id: 'a4', dt: dtOff(1, '09:30'), kind: 'broker', contactId: 'b3', name: 'Bereket Tadesse', phone: '+251 91 888 2233', propId: 'p4', address: 'CMC Michael Park, Villa 12', teamId: 't1', status: 'Scheduled', notes: 'Gated community — call guard first.', lat: 9.0135, lng: 38.8345, isShoot: true },
+      { id: 'a5', dt: dtOff(1, '11:00'), kind: 'owner', contactId: 'o2', name: 'W/ro Almaz Tesfaye', phone: '+251 92 987 6543', propId: '', address: 'Megenagna Corner, Apt 2A', teamId: 't4', status: 'Scheduled', notes: 'Owner walkthrough and floor plan review.', lat: 9.0209, lng: 38.8010, isShoot: false },
+      { id: 'a6', dt: dtOff(2, '13:00'), kind: 'owner', contactId: 'o3', name: 'Ato Tadesse Worku', phone: '+251 91 445 2211', propId: 'p2', address: 'Bole Vista Townhouse 7', teamId: 't1', status: 'Scheduled', notes: 'Bring drone.', lat: 9.0080, lng: 38.8050, isShoot: false },
+      { id: 'a7', dt: dtOff(3, '10:30'), kind: 'broker', contactId: 'b6', name: 'Natnael Fikre', phone: '+251 91 605 3312', propId: 'p6', address: 'Ayat Real Estate, Villa 22', teamId: 't4', status: 'Scheduled', notes: 'Exterior-wide angle and interior lifestyle shoot.', lat: 9.0300, lng: 38.8600, isShoot: true },
+      { id: 'a8', dt: dtOff(-1, '10:00'), kind: 'broker', contactId: 'b4', name: 'Sara Mekonnen', phone: '+251 93 771 4455', propId: '', address: 'Piassa Heritage Row, Office 3', teamId: 't2', status: 'Completed', notes: 'Delivered 34 photos.', lat: 9.0350, lng: 38.7500, isShoot: true },
+      { id: 'a9', dt: dtOff(-1, '15:00'), kind: 'broker', contactId: 'b5', name: 'Lidiya Girma', phone: '+251 94 220 9081', propId: 'p5', address: 'Sarbet Sunflower, Apt 9C', teamId: 't3', status: 'Completed', notes: 'Final listing photos delivered.', lat: 8.9910, lng: 38.7430, isShoot: true },
+      { id: 'a10', dt: dtOff(-3, '10:00'), kind: 'broker', contactId: 'b1', name: 'Samuel Bekele', phone: '+251 91 123 4567', propId: '', address: 'Gerji Imperial, Apt 5F', teamId: 't1', status: 'Completed', notes: 'Completed exterior and staircase stills.', lat: 8.9880, lng: 38.7900, isShoot: true },
+      { id: 'a11', dt: dtOff(-1, '09:00'), kind: 'broker', contactId: 'b7', name: 'Eyob Haile', phone: '+251 92 118 0094', propId: '', address: 'Kality Warehouse District', teamId: 't3', status: 'Cancelled', notes: 'Broker unreachable.', lat: 8.9170, lng: 38.7980, isShoot: false }
     ],
     followups: [
       { id: 'f1', doc: dOff(-4), name: 'Ato Kebede', phone: '+251 91 234 5678', property: 'Summit Residential', status: 'Waiting for manager approval', next: dOff(3), action: 'Confirm pricing with Head of Sales' },
@@ -271,6 +271,23 @@ export function getSeedData(): DatabaseSchema {
   };
 }
 
+function normalizeAppointments(data: DatabaseSchema): DatabaseSchema {
+  if (!Array.isArray(data.appointments)) {
+    data.appointments = [];
+  }
+
+  data.appointments = data.appointments.map(appt => ({
+    ...appt,
+    isShoot: appt.isShoot ?? (appt.kind === 'broker' ? true : false),
+    kind: appt.kind ?? 'broker',
+    status: appt.status ?? 'Scheduled',
+    propId: appt.propId ?? '',
+    teamId: appt.teamId ?? ''
+  }));
+
+  return data;
+}
+
 export function loadDatabase(): DatabaseSchema {
   if (typeof window === 'undefined') return getSeedData();
   try {
@@ -279,24 +296,26 @@ export function loadDatabase(): DatabaseSchema {
     const data: DatabaseSchema = JSON.parse(raw);
     if (!data || !data.teams) return getSeedData();
 
+    const normalized = normalizeAppointments(data);
+
     // Auto-merge missing seed user accounts (e.g. team1, team2, team3, team4, manager Akrem Seud)
     const seed = getSeedData();
     let updated = false;
     seed.users.forEach(su => {
-      const idx = data.users.findIndex(u => u.u === su.u);
+      const idx = normalized.users.findIndex(u => u.u === su.u);
       if (idx === -1) {
-        data.users.push(su);
+        normalized.users.push(su);
         updated = true;
-      } else if (su.u === 'manager' && data.users[idx].name !== 'Akrem Seud') {
-        data.users[idx].name = 'Akrem Seud';
+      } else if (su.u === 'manager' && normalized.users[idx].name !== 'Akrem Seud') {
+        normalized.users[idx].name = 'Akrem Seud';
         updated = true;
       }
     });
 
-    if (updated) {
-      localStorage.setItem(KEY, JSON.stringify(data));
+    if (updated || normalized.appointments.some(a => a.isShoot === undefined)) {
+      localStorage.setItem(KEY, JSON.stringify(normalized));
     }
-    return data;
+    return normalized;
   } catch (e) {
     return getSeedData();
   }
@@ -312,6 +331,7 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
       await saveDatabaseToSupabase(seed);
       remoteData = seed;
     } else {
+      remoteData = normalizeAppointments(remoteData);
       // Ensure all seed accounts exist in remoteData
       let seedUpdated = false;
       seed.users.forEach(su => {
@@ -320,7 +340,7 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
           seedUpdated = true;
         }
       });
-      if (seedUpdated) {
+      if (seedUpdated || remoteData.appointments.some(a => a.isShoot === undefined)) {
         await saveDatabaseToSupabase(remoteData);
       }
     }
