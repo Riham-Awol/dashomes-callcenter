@@ -1631,12 +1631,17 @@ textarea.inp {
 }
 .team-body {
   padding: 18px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 .team-body h4 {
   font: 700 19px 'Fraunces', serif;
   display: flex;
   align-items: center;
   gap: 9px;
+  line-height: 1.2;
+  margin: 0 0 10px;
 }
 .team-body h4 .sw {
   width: 13px;
@@ -1644,6 +1649,46 @@ textarea.inp {
   border-radius: 50%;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .15);
+  flex-shrink: 0;
+}
+.team-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.team-member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  background: var(--cream2);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--sageline);
+}
+.team-member-name {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+.team-member-phone {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: right;
+  word-break: break-word;
+}
+.team-empty-member {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--cream2);
+  border: 1px solid var(--sageline);
+  border-radius: 6px;
+  padding: 8px 10px;
 }
 .team-meta {
   font: 500 12px 'IBM Plex Mono';
@@ -1653,6 +1698,7 @@ textarea.inp {
 .team-stats {
   display: flex;
   gap: 10px;
+  margin-top: auto;
   margin-bottom: 14px;
 }
 .team-stats div {

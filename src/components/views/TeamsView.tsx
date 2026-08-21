@@ -162,16 +162,16 @@ export function TeamsView({
                   Registered Members ({t.members?.length || 0}):
                 </div>
                 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
+                <div className="team-member-list">
                   {t.members?.length ? (
                     t.members.map(m => (
-                      <div key={m.id} style={{ fontSize: '12.5px', background: 'var(--cream2)', padding: '4px 8px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between' }}>
-                        <b>{m.name}</b>
-                        <span className="mono" style={{ color: 'var(--muted)' }}>{m.phone}</span>
+                      <div key={m.id} className="team-member-row">
+                        <b className="team-member-name">{m.name}</b>
+                        <span className="team-member-phone mono">{m.phone}</span>
                       </div>
                     ))
                   ) : (
-                    <div style={{ fontSize: '12px', fontStyle: 'italic', color: 'var(--muted)' }}>Lead: {t.lead || 'No registered members'} ({t.phone})</div>
+                    <div className="team-empty-member">Lead: {t.lead || 'No registered members'} ({t.phone})</div>
                   )}
                 </div>
 
