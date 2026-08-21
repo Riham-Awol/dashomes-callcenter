@@ -17,6 +17,17 @@ export const supabase = isSupabaseConfigured()
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
+function isCompatibleSupabaseSchema(data: Partial<DatabaseSchema>): boolean {
+  if (!data || !Array.isArray(data.users) || !Array.isArray(data.teams) || !Array.isArray(data.appointments)) {
+    return false;
+  }
+
+  const usersOk = data.users.length === 0 || data.users.some(u => typeof u === 'object' && u !== null && 'u' in u && 'p' in u);
+  const appointmentsOk = data.appointments.length === 0 || data.appointments.some(a => typeof a === 'object' && a !== null && 'kind' in a && 'dt' in a);
+
+  return usersOk && appointmentsOk;
+}
+
 // Helper to load all application state from Supabase
 export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null> {
   if (!supabase) return null;
@@ -42,7 +53,7 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
       supabase.from('activity').select('*')
     ]);
 
-    return {
+    const remoteData = {
       users: users || [],
       teams: teams || [],
       brokers: brokers || [],
@@ -52,6 +63,13 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
       followups: followups || [],
       activity: activity || []
     };
+
+    if (!isCompatibleSupabaseSchema(remoteData)) {
+      console.warn('Supabase schema does not match the app data model; falling back to local seed data.');
+      return null;
+    }
+
+    return remoteData;
   } catch (err) {
     console.error('Failed to fetch from Supabase:', err);
     return null;
@@ -60,7 +78,7 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
 
 // Helper to save complete state snapshot to Supabase
 export async function saveDatabaseToSupabase(data: DatabaseSchema): Promise<boolean> {
-  if (!supabase) return false;
+  if (!supabase || !isCompatibleSupabaseSchema(data)) return false;
 
   try {
     await Promise.all([

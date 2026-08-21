@@ -17,6 +17,17 @@ export const TEAM_COLORS = [
   '#4E4A45'
 ];
 
+function isAppDataShapeCompatible(data: Partial<DatabaseSchema>): boolean {
+  if (!data || !Array.isArray(data.users) || !Array.isArray(data.teams) || !Array.isArray(data.appointments)) {
+    return false;
+  }
+
+  const hasValidUsers = data.users.length === 0 || data.users.some(u => typeof u === 'object' && u !== null && 'u' in u && 'p' in u);
+  const hasValidAppointments = data.appointments.length === 0 || data.appointments.some(a => typeof a === 'object' && a !== null && 'kind' in a && 'dt' in a);
+
+  return hasValidUsers && hasValidAppointments;
+}
+
 export function getSeedData(): DatabaseSchema {
   return {
     users: [
@@ -289,35 +300,56 @@ function normalizeAppointments(data: DatabaseSchema): DatabaseSchema {
 }
 
 export function loadDatabase(): DatabaseSchema {
-  if (typeof window === 'undefined') return getSeedData();
+  const seed = getSeedData();
+  if (typeof window === 'undefined') return seed;
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return getSeedData();
+    if (!raw) return seed;
     const data: DatabaseSchema = JSON.parse(raw);
-    if (!data || !data.teams) return getSeedData();
+
+    if (!isAppDataShapeCompatible(data)) {
+      localStorage.setItem(KEY, JSON.stringify(seed));
+      return seed;
+    }
 
     const normalized = normalizeAppointments(data);
 
+    const hasEmptySeedState = normalized.teams.length === 0 || normalized.users.length === 0 || normalized.appointments.length === 0;
+    const baseData = hasEmptySeedState ? seed : normalized;
+
     // Auto-merge missing seed user accounts (e.g. team1, team2, team3, team4, manager Akrem Seud)
-    const seed = getSeedData();
     let updated = false;
     seed.users.forEach(su => {
-      const idx = normalized.users.findIndex(u => u.u === su.u);
+      const idx = baseData.users.findIndex(u => u.u === su.u);
       if (idx === -1) {
-        normalized.users.push(su);
+        baseData.users.push(su);
         updated = true;
-      } else if (su.u === 'manager' && normalized.users[idx].name !== 'Akrem Seud') {
-        normalized.users[idx].name = 'Akrem Seud';
+      } else if (su.u === 'manager' && baseData.users[idx].name !== 'Akrem Seud') {
+        baseData.users[idx].name = 'Akrem Seud';
         updated = true;
       }
     });
 
-    if (updated || normalized.appointments.some(a => a.isShoot === undefined)) {
-      localStorage.setItem(KEY, JSON.stringify(normalized));
+    if (hasEmptySeedState || updated || baseData.appointments.some(a => a.isShoot === undefined)) {
+      const finalData = {
+        ...baseData,
+        appointments: baseData.appointments.length ? baseData.appointments : seed.appointments,
+        teams: baseData.teams.length ? baseData.teams : seed.teams,
+        users: baseData.users.length ? baseData.users : seed.users,
+        brokers: baseData.brokers.length ? baseData.brokers : seed.brokers,
+        owners: baseData.owners.length ? baseData.owners : seed.owners,
+        properties: baseData.properties.length ? baseData.properties : seed.properties,
+        followups: baseData.followups.length ? baseData.followups : seed.followups,
+        activity: baseData.activity.length ? baseData.activity : seed.activity
+      };
+      localStorage.setItem(KEY, JSON.stringify(finalData));
+      return finalData;
     }
-    return normalized;
+
+    return baseData;
   } catch (e) {
-    return getSeedData();
+    localStorage.setItem(KEY, JSON.stringify(seed));
+    return seed;
   }
 }
 
@@ -326,10 +358,22 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
     let remoteData = await fetchDatabaseFromSupabase();
     const seed = getSeedData();
 
-    if (!remoteData || remoteData.users.length === 0) {
+    if (!remoteData || remoteData.users.length === 0 || remoteData.teams.length === 0 || remoteData.appointments.length === 0) {
       // Auto-seed Supabase Cloud database with default accounts and initial records
-      await saveDatabaseToSupabase(seed);
-      remoteData = seed;
+      const hydrated = {
+        ...seed,
+        ...remoteData,
+        users: remoteData?.users?.length ? remoteData.users : seed.users,
+        teams: remoteData?.teams?.length ? remoteData.teams : seed.teams,
+        brokers: remoteData?.brokers?.length ? remoteData.brokers : seed.brokers,
+        owners: remoteData?.owners?.length ? remoteData.owners : seed.owners,
+        properties: remoteData?.properties?.length ? remoteData.properties : seed.properties,
+        appointments: remoteData?.appointments?.length ? remoteData.appointments : seed.appointments,
+        followups: remoteData?.followups?.length ? remoteData.followups : seed.followups,
+        activity: remoteData?.activity?.length ? remoteData.activity : seed.activity
+      };
+      await saveDatabaseToSupabase(hydrated);
+      remoteData = hydrated;
     } else {
       remoteData = normalizeAppointments(remoteData);
       // Ensure all seed accounts exist in remoteData
