@@ -349,44 +349,54 @@ export function loadDatabase(): DatabaseSchema {
 }
 
 export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
+  const localData = loadDatabase();
+
   if (isSupabaseConfigured()) {
-    let remoteData = await fetchDatabaseFromSupabase();
-    const seed = getSeedData();
+    try {
+      let remoteData = await fetchDatabaseFromSupabase();
 
-    if (!remoteData || remoteData.users.length === 0 || remoteData.teams.length === 0 || remoteData.appointments.length === 0) {
-      // Auto-seed Supabase Cloud database with default accounts and initial records
-      const hydrated = {
-        ...seed,
-        ...remoteData,
-        users: remoteData?.users?.length ? remoteData.users : seed.users,
-        teams: remoteData?.teams?.length ? remoteData.teams : seed.teams,
-        brokers: (remoteData?.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id)),
-        owners: remoteData?.owners?.length ? remoteData.owners : seed.owners,
-        properties: remoteData?.properties?.length ? remoteData.properties : seed.properties,
-        appointments: remoteData?.appointments?.length ? remoteData.appointments : seed.appointments,
-        followups: remoteData?.followups?.length ? remoteData.followups : seed.followups,
-        activity: remoteData?.activity?.length ? remoteData.activity : seed.activity
-      };
-      await saveDatabaseToSupabase(hydrated);
-      remoteData = hydrated;
-    } else {
+      if (!remoteData) {
+        return localData;
+      }
+
       remoteData = normalizeAppointments(remoteData);
-      remoteData.brokers = (remoteData.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
-      // Ensure all seed accounts exist in remoteData
-      let seedUpdated = false;
-      seed.users.forEach(su => {
-        if (!remoteData!.users.some(u => u.u === su.u)) {
-          remoteData!.users.push(su);
-          seedUpdated = true;
-        }
-      });
-      await saveDatabaseToSupabase(remoteData);
-    }
 
-    saveDatabase(remoteData);
-    return remoteData;
+      // Smart fail-safe merge: combine local and remote records so user data is never lost on refresh
+      const mergeById = <T extends Record<string, any>>(localArr: T[] = [], remoteArr: T[] = [], key: string = 'id'): T[] => {
+        const map = new Map<string, T>();
+        (remoteArr || []).forEach(item => {
+          const k = item[key];
+          if (k) map.set(String(k), item);
+        });
+        (localArr || []).forEach(item => {
+          const k = item[key];
+          if (k) {
+            // Local records take precedence to prevent overwriting newly added items
+            map.set(String(k), { ...map.get(String(k)), ...item });
+          }
+        });
+        return Array.from(map.values());
+      };
+
+      const mergedData: DatabaseSchema = {
+        users: mergeById(localData.users, remoteData.users, 'u'),
+        teams: mergeById(localData.teams, remoteData.teams, 'id'),
+        brokers: mergeById(localData.brokers, remoteData.brokers, 'id').filter(b => !SEED_BROKER_IDS.has(b.id)),
+        owners: mergeById(localData.owners, remoteData.owners, 'id'),
+        properties: mergeById(localData.properties, remoteData.properties, 'id'),
+        appointments: mergeById(localData.appointments, remoteData.appointments, 'id'),
+        followups: mergeById(localData.followups, remoteData.followups, 'id'),
+        activity: mergeById(localData.activity, remoteData.activity, 'id')
+      };
+
+      saveDatabase(mergedData);
+      return mergedData;
+    } catch (e) {
+      console.error('Error during database async sync:', e);
+      return localData;
+    }
   }
-  return loadDatabase();
+  return localData;
 }
 
 export function saveDatabase(data: DatabaseSchema) {
