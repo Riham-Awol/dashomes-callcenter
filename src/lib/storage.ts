@@ -83,16 +83,7 @@ export function getSeedData(): DatabaseSchema {
         members: [{ id: 'm6', name: 'Hanna Girma', phone: '+251 94 555 0404' }]
       }
     ],
-    brokers: [
-      { id: 'b1', name: 'Samuel Bekele', phone: '+251 91 123 4567', address: 'Bole Road', area: 'Bole Atlas', notes: 'High-volume Bole broker; prefers morning shoots', active: true, approvalStatus: 'Approved' },
-      { id: 'b2', name: 'Ruth Alemu', phone: '+251 92 456 7890', address: 'Kazanchis Total', area: 'Kazanchis', notes: 'Kazanchis & Piassa specialist', active: true, approvalStatus: 'Approved' },
-      { id: 'b3', name: 'Bereket Tadesse', phone: '+251 91 888 2233', address: 'CMC Roundabout', area: 'CMC', notes: 'Works the CMC / Ayat corridor', active: true, approvalStatus: 'Approved' },
-      { id: 'b4', name: 'Sara Mekonnen', phone: '+251 93 771 4455', address: 'Piassa Row', area: 'Piassa', notes: 'Responds fast on Telegram', active: true, approvalStatus: 'Approved' },
-      { id: 'b5', name: 'Lidiya Girma', phone: '+251 94 220 9081', address: 'Sarbet Sunflower', area: 'Sarbet', notes: 'Sarbet area listings', active: true, approvalStatus: 'Approved' },
-      { id: 'b6', name: 'Natnael Fikre', phone: '+251 91 605 3312', address: 'Ayat Zone 2', area: 'Ayat', notes: '', active: true, approvalStatus: 'Approved' },
-      { id: 'b7', name: 'Eyob Haile', phone: '+251 92 118 0094', address: 'Kality', area: 'Kality', notes: 'Inactive since July — changed brokerage', active: false, approvalStatus: 'Rejected' },
-      { id: 'b8', name: 'Hanna Solomon', phone: '+251 96 340 7788', address: 'Gotera', area: 'Gotera', notes: 'New partner — onboarded last week', active: true, approvalStatus: 'Pending' }
-    ],
+    brokers: [],
     owners: [
       { id: 'o1', name: 'Ato Kebede', phone: '+251 91 234 5678', notes: 'Summit Residential — prefers calls after 4 PM' },
       { id: 'o2', name: 'W/ro Almaz Tesfaye', phone: '+251 92 987 6543', notes: 'Megenagna Corner; negotiating terms' },
@@ -106,7 +97,7 @@ export function getSeedData(): DatabaseSchema {
         name: 'Summit Residential — 4B',
         owner: 'Ato Kebede',
         phone: '+251 91 234 5678',
-        brokerId: 'b1',
+        brokerId: '',
         type: 'Apartment',
         floors: '',
         bedrooms: 3,
@@ -132,7 +123,7 @@ export function getSeedData(): DatabaseSchema {
         name: 'Bole Vista Townhouse 7',
         owner: 'Ato Tadesse Worku',
         phone: '+251 91 445 2211',
-        brokerId: 'b1',
+        brokerId: '',
         type: 'Townhouse',
         floors: 'G+2',
         bedrooms: 5,
@@ -157,7 +148,7 @@ export function getSeedData(): DatabaseSchema {
         name: 'Kazanchis Plaza 2A',
         owner: 'W/ro Selam Girma',
         phone: '+251 93 812 3490',
-        brokerId: 'b2',
+        brokerId: '',
         type: 'Apartment',
         floors: '',
         bedrooms: 2,
@@ -299,16 +290,21 @@ function normalizeAppointments(data: DatabaseSchema): DatabaseSchema {
   return data;
 }
 
+const SEED_BROKER_IDS = new Set(['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8']);
+
 export function loadDatabase(): DatabaseSchema {
   const seed = getSeedData();
   if (typeof window === 'undefined') return seed;
+
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return seed;
-    const data: DatabaseSchema = JSON.parse(raw);
-
+    if (!raw) {
+      saveDatabase(seed);
+      return seed;
+    }
+    const data = JSON.parse(raw);
     if (!isAppDataShapeCompatible(data)) {
-      localStorage.setItem(KEY, JSON.stringify(seed));
+      saveDatabase(seed);
       return seed;
     }
 
@@ -316,6 +312,9 @@ export function loadDatabase(): DatabaseSchema {
 
     const hasEmptySeedState = normalized.teams.length === 0 || normalized.users.length === 0 || normalized.appointments.length === 0;
     const baseData = hasEmptySeedState ? seed : normalized;
+
+    // Filter out old seed brokers
+    baseData.brokers = (baseData.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
 
     // Auto-merge missing seed user accounts (e.g. team1, team2, team3, team4, manager Akrem Seud)
     let updated = false;
@@ -330,25 +329,21 @@ export function loadDatabase(): DatabaseSchema {
       }
     });
 
-    if (hasEmptySeedState || updated || baseData.appointments.some(a => a.isShoot === undefined)) {
-      const finalData = {
-        ...baseData,
-        appointments: baseData.appointments.length ? baseData.appointments : seed.appointments,
-        teams: baseData.teams.length ? baseData.teams : seed.teams,
-        users: baseData.users.length ? baseData.users : seed.users,
-        brokers: baseData.brokers.length ? baseData.brokers : seed.brokers,
-        owners: baseData.owners.length ? baseData.owners : seed.owners,
-        properties: baseData.properties.length ? baseData.properties : seed.properties,
-        followups: baseData.followups.length ? baseData.followups : seed.followups,
-        activity: baseData.activity.length ? baseData.activity : seed.activity
-      };
-      localStorage.setItem(KEY, JSON.stringify(finalData));
-      return finalData;
-    }
-
-    return baseData;
+    const finalData = {
+      ...baseData,
+      appointments: baseData.appointments.length ? baseData.appointments : seed.appointments,
+      teams: baseData.teams.length ? baseData.teams : seed.teams,
+      users: baseData.users.length ? baseData.users : seed.users,
+      brokers: baseData.brokers || [],
+      owners: baseData.owners.length ? baseData.owners : seed.owners,
+      properties: baseData.properties.length ? baseData.properties : seed.properties,
+      followups: baseData.followups.length ? baseData.followups : seed.followups,
+      activity: baseData.activity.length ? baseData.activity : seed.activity
+    };
+    localStorage.setItem(KEY, JSON.stringify(finalData));
+    return finalData;
   } catch (e) {
-    localStorage.setItem(KEY, JSON.stringify(seed));
+    saveDatabase(seed);
     return seed;
   }
 }
@@ -365,7 +360,7 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
         ...remoteData,
         users: remoteData?.users?.length ? remoteData.users : seed.users,
         teams: remoteData?.teams?.length ? remoteData.teams : seed.teams,
-        brokers: remoteData?.brokers?.length ? remoteData.brokers : seed.brokers,
+        brokers: (remoteData?.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id)),
         owners: remoteData?.owners?.length ? remoteData.owners : seed.owners,
         properties: remoteData?.properties?.length ? remoteData.properties : seed.properties,
         appointments: remoteData?.appointments?.length ? remoteData.appointments : seed.appointments,
@@ -376,6 +371,7 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
       remoteData = hydrated;
     } else {
       remoteData = normalizeAppointments(remoteData);
+      remoteData.brokers = (remoteData.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
       // Ensure all seed accounts exist in remoteData
       let seedUpdated = false;
       seed.users.forEach(su => {
@@ -384,9 +380,7 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
           seedUpdated = true;
         }
       });
-      if (seedUpdated || remoteData.appointments.some(a => a.isShoot === undefined)) {
-        await saveDatabaseToSupabase(remoteData);
-      }
+      await saveDatabaseToSupabase(remoteData);
     }
 
     saveDatabase(remoteData);
