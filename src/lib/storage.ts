@@ -310,39 +310,35 @@ export function loadDatabase(): DatabaseSchema {
 
     const normalized = normalizeAppointments(data);
 
-    const hasEmptySeedState = normalized.teams.length === 0 || normalized.users.length === 0 || normalized.appointments.length === 0;
-    const baseData = hasEmptySeedState ? seed : normalized;
+    // Filter out old seed brokers if present
+    const cleanBrokers = (normalized.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
 
-    // Filter out old seed brokers
-    baseData.brokers = (baseData.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
-
-    // Auto-merge missing seed user accounts (e.g. team1, team2, team3, team4, manager Akrem Seud)
-    let updated = false;
+    // Ensure all required seed user accounts exist (e.g. admin, manager, team accounts)
+    const users = [...(normalized.users || [])];
     seed.users.forEach(su => {
-      const idx = baseData.users.findIndex(u => u.u === su.u);
+      const idx = users.findIndex(u => u.u === su.u);
       if (idx === -1) {
-        baseData.users.push(su);
-        updated = true;
-      } else if (su.u === 'manager' && baseData.users[idx].name !== 'Akrem Seud') {
-        baseData.users[idx].name = 'Akrem Seud';
-        updated = true;
+        users.push(su);
+      } else if (su.u === 'manager' && users[idx].name !== 'Akrem Seud') {
+        users[idx].name = 'Akrem Seud';
       }
     });
 
-    const finalData = {
-      ...baseData,
-      appointments: baseData.appointments.length ? baseData.appointments : seed.appointments,
-      teams: baseData.teams.length ? baseData.teams : seed.teams,
-      users: baseData.users.length ? baseData.users : seed.users,
-      brokers: baseData.brokers || [],
-      owners: baseData.owners.length ? baseData.owners : seed.owners,
-      properties: baseData.properties.length ? baseData.properties : seed.properties,
-      followups: baseData.followups.length ? baseData.followups : seed.followups,
-      activity: baseData.activity.length ? baseData.activity : seed.activity
+    const finalData: DatabaseSchema = {
+      users: users.length ? users : seed.users,
+      teams: normalized.teams?.length ? normalized.teams : seed.teams,
+      brokers: cleanBrokers,
+      owners: normalized.owners || [],
+      properties: normalized.properties || [],
+      appointments: normalized.appointments || [],
+      followups: normalized.followups || [],
+      activity: normalized.activity || []
     };
+
     localStorage.setItem(KEY, JSON.stringify(finalData));
     return finalData;
   } catch (e) {
+    console.error('Error loading database from localStorage:', e);
     saveDatabase(seed);
     return seed;
   }
@@ -351,52 +347,53 @@ export function loadDatabase(): DatabaseSchema {
 export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
   const localData = loadDatabase();
 
-  if (isSupabaseConfigured()) {
-    try {
-      let remoteData = await fetchDatabaseFromSupabase();
+  if (!isSupabaseConfigured()) {
+    return localData;
+  }
 
-      if (!remoteData) {
-        return localData;
-      }
+  try {
+    let remoteData = await fetchDatabaseFromSupabase();
 
-      remoteData = normalizeAppointments(remoteData);
-
-      // Smart fail-safe merge: combine local and remote records so user data is never lost on refresh
-      const mergeById = <T extends Record<string, any>>(localArr: T[] = [], remoteArr: T[] = [], key: string = 'id'): T[] => {
-        const map = new Map<string, T>();
-        (remoteArr || []).forEach(item => {
-          const k = item[key];
-          if (k) map.set(String(k), item);
-        });
-        (localArr || []).forEach(item => {
-          const k = item[key];
-          if (k) {
-            // Local records take precedence to prevent overwriting newly added items
-            map.set(String(k), { ...map.get(String(k)), ...item });
-          }
-        });
-        return Array.from(map.values());
-      };
-
-      const mergedData: DatabaseSchema = {
-        users: mergeById(localData.users, remoteData.users, 'u'),
-        teams: mergeById(localData.teams, remoteData.teams, 'id'),
-        brokers: mergeById(localData.brokers, remoteData.brokers, 'id').filter(b => !SEED_BROKER_IDS.has(b.id)),
-        owners: mergeById(localData.owners, remoteData.owners, 'id'),
-        properties: mergeById(localData.properties, remoteData.properties, 'id'),
-        appointments: mergeById(localData.appointments, remoteData.appointments, 'id'),
-        followups: mergeById(localData.followups, remoteData.followups, 'id'),
-        activity: mergeById(localData.activity, remoteData.activity, 'id')
-      };
-
-      saveDatabase(mergedData);
-      return mergedData;
-    } catch (e) {
-      console.error('Error during database async sync:', e);
+    if (!remoteData) {
       return localData;
     }
+
+    remoteData = normalizeAppointments(remoteData);
+
+    // Smart fail-safe merge: combine local and remote records so user data is never lost on refresh
+    const mergeById = <T extends Record<string, any>>(localArr: T[] = [], remoteArr: T[] = [], key: string = 'id'): T[] => {
+      const map = new Map<string, T>();
+      (remoteArr || []).forEach(item => {
+        const k = item[key];
+        if (k != null) map.set(String(k), item);
+      });
+      (localArr || []).forEach(item => {
+        const k = item[key];
+        if (k != null) {
+          // Local records take precedence to prevent overwriting newly added items
+          map.set(String(k), { ...map.get(String(k)), ...item });
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    const mergedData: DatabaseSchema = {
+      users: mergeById(localData.users, remoteData.users, 'u'),
+      teams: mergeById(localData.teams, remoteData.teams, 'id'),
+      brokers: mergeById(localData.brokers, remoteData.brokers, 'id').filter(b => !SEED_BROKER_IDS.has(b.id)),
+      owners: mergeById(localData.owners, remoteData.owners, 'id'),
+      properties: mergeById(localData.properties, remoteData.properties, 'id'),
+      appointments: mergeById(localData.appointments, remoteData.appointments, 'id'),
+      followups: mergeById(localData.followups, remoteData.followups, 'id'),
+      activity: mergeById(localData.activity, remoteData.activity, 'id')
+    };
+
+    saveDatabase(mergedData);
+    return mergedData;
+  } catch (e) {
+    console.error('Error during database async sync:', e);
+    return localData;
   }
-  return localData;
 }
 
 export function saveDatabase(data: DatabaseSchema) {
