@@ -1,148 +1,198 @@
--- Supabase Schema for DasHomes Call Center
+-- ============================================================
+-- DasHomes CallCenter — Supabase Schema
+-- Matches the app's TypeScript interfaces exactly.
+-- Run this in Supabase Dashboard → SQL Editor
+-- ============================================================
 
--- 1. Users Table
+-- Drop existing tables (safe to re-run)
+DROP TABLE IF EXISTS activity CASCADE;
+DROP TABLE IF EXISTS followups CASCADE;
+DROP TABLE IF EXISTS appointments CASCADE;
+DROP TABLE IF EXISTS properties CASCADE;
+DROP TABLE IF EXISTS owners CASCADE;
+DROP TABLE IF EXISTS brokers CASCADE;
+DROP TABLE IF EXISTS teams CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- ============================================================
+-- 1. Users  (PK = u, the username)
+-- App type: { u, p, name, role, teamId? }
+-- ============================================================
 CREATE TABLE users (
-    id TEXT PRIMARY KEY,
-    username TEXT NOT NULL,
-    password TEXT NOT NULL,
-    name TEXT NOT NULL,
-    role TEXT NOT NULL,
-    teamId TEXT,
-    avatar TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  u     TEXT PRIMARY KEY,
+  p     TEXT NOT NULL,
+  name  TEXT NOT NULL,
+  role  TEXT NOT NULL,
+  team_id TEXT
 );
 
--- 2. Teams Table
+-- ============================================================
+-- 2. Teams
+-- App type: { id, name, color, lead?, phone?, date?, members: TeamMember[] }
+-- ============================================================
 CREATE TABLE teams (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    color TEXT NOT NULL,
-    leader TEXT,
-    members TEXT[], -- Array of strings (broker IDs)
-    target INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id      TEXT PRIMARY KEY,
+  name    TEXT NOT NULL,
+  color   TEXT NOT NULL,
+  lead    TEXT,
+  phone   TEXT,
+  date    TEXT,
+  members JSONB DEFAULT '[]'::jsonb
 );
 
--- 3. Brokers Table
+-- ============================================================
+-- 3. Brokers
+-- App type: { id, name, phone, address?, area?, notes, active, approvalStatus }
+-- ============================================================
 CREATE TABLE brokers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    teamId TEXT NOT NULL,
-    status TEXT NOT NULL, -- 'Active' | 'Busy' | 'Offline'
-    rating NUMERIC,
-    active_deals INTEGER,
-    avatar TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  phone           TEXT NOT NULL,
+  address         TEXT,
+  area            TEXT,
+  notes           TEXT DEFAULT '',
+  active          BOOLEAN DEFAULT true,
+  approval_status TEXT DEFAULT 'Pending'
 );
 
--- 4. Owners Table
+-- ============================================================
+-- 4. Owners
+-- App type: { id, name, phone, notes }
+-- ============================================================
 CREATE TABLE owners (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    type TEXT NOT NULL, -- 'Developer' | 'Private' | 'Agency'
-    rating NUMERIC,
-    properties INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id    TEXT PRIMARY KEY,
+  name  TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  notes TEXT DEFAULT ''
 );
 
--- 5. Properties Table
+-- ============================================================
+-- 5. Properties
+-- ============================================================
 CREATE TABLE properties (
-    id TEXT PRIMARY KEY,
-    ownerId TEXT NOT NULL,
-    type TEXT NOT NULL,
-    status TEXT NOT NULL,
-    price INTEGER NOT NULL,
-    location TEXT NOT NULL,
-    lat NUMERIC,
-    lng NUMERIC,
-    bedrooms INTEGER,
-    bathrooms INTEGER,
-    area INTEGER,
-    furnished BOOLEAN,
-    amenities TEXT[],
-    photos TEXT[],
-    listedDate TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id               TEXT PRIMARY KEY,
+  name             TEXT NOT NULL,
+  owner            TEXT NOT NULL,
+  phone            TEXT NOT NULL,
+  broker_id        TEXT,
+  type             TEXT NOT NULL,
+  custom_type      TEXT,
+  floors           TEXT,
+  bedrooms         INTEGER DEFAULT 0,
+  bathrooms        INTEGER,
+  listing          TEXT NOT NULL DEFAULT 'sale',
+  lease_duration   TEXT,
+  min_rent         TEXT,
+  furnished        BOOLEAN DEFAULT false,
+  sqm              INTEGER DEFAULT 0,
+  address          TEXT NOT NULL DEFAULT '',
+  unit_floor       TEXT,
+  amenities        TEXT DEFAULT '',
+  price            INTEGER DEFAULT 0,
+  fee              INTEGER DEFAULT 0,
+  deposit          INTEGER DEFAULT 0,
+  lat              DOUBLE PRECISION,
+  lng              DOUBLE PRECISION,
+  notes            TEXT DEFAULT '',
+  photo            TEXT,
+  photos           JSONB DEFAULT '[]'::jsonb,
+  remarks          TEXT,
+  approval_status  TEXT DEFAULT 'Pending',
+  assigned_team_id TEXT
 );
 
--- 6. Appointments Table
+-- ============================================================
+-- 6. Appointments
+-- ============================================================
 CREATE TABLE appointments (
-    id TEXT PRIMARY KEY,
-    clientId TEXT NOT NULL,
-    clientName TEXT NOT NULL,
-    clientPhone TEXT NOT NULL,
-    propertyId TEXT,
-    brokerId TEXT NOT NULL,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    type TEXT NOT NULL,
-    status TEXT NOT NULL,
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id                        TEXT PRIMARY KEY,
+  dt                        TEXT NOT NULL,
+  kind                      TEXT NOT NULL,
+  contact_id                TEXT DEFAULT '',
+  name                      TEXT NOT NULL DEFAULT '',
+  phone                     TEXT NOT NULL DEFAULT '',
+  prop_id                   TEXT DEFAULT '',
+  address                   TEXT DEFAULT '',
+  team_id                   TEXT DEFAULT '',
+  status                    TEXT NOT NULL DEFAULT 'Scheduled',
+  notes                     TEXT DEFAULT '',
+  lat                       DOUBLE PRECISION,
+  lng                       DOUBLE PRECISION,
+  is_shoot                  BOOLEAN DEFAULT false,
+  incompletion_reason       TEXT,
+  completed_by_members      JSONB DEFAULT '[]'::jsonb,
+  assigned_members_snapshot JSONB DEFAULT '[]'::jsonb
 );
 
--- 7. FollowUps Table
+-- ============================================================
+-- 7. Follow-ups
+-- ============================================================
 CREATE TABLE followups (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    targetId TEXT NOT NULL,
-    targetName TEXT NOT NULL,
-    agentId TEXT NOT NULL,
-    dueDate TEXT NOT NULL,
-    status TEXT NOT NULL,
-    notes TEXT,
-    priority TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id       TEXT PRIMARY KEY,
+  doc      TEXT NOT NULL DEFAULT '',
+  name     TEXT NOT NULL DEFAULT '',
+  phone    TEXT NOT NULL DEFAULT '',
+  property TEXT DEFAULT '',
+  status   TEXT NOT NULL DEFAULT 'New lead',
+  next     TEXT DEFAULT '',
+  action   TEXT DEFAULT '',
+  priority TEXT DEFAULT 'Normal'
 );
 
--- 8. Activity Table
+-- ============================================================
+-- 8. Activity
+-- ============================================================
 CREATE TABLE activity (
-    id TEXT PRIMARY KEY,
-    userId TEXT NOT NULL,
-    userName TEXT NOT NULL,
-    action TEXT NOT NULL,
-    target TEXT NOT NULL,
-    time TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+  id   TEXT PRIMARY KEY,
+  ts   BIGINT NOT NULL,
+  text TEXT NOT NULL DEFAULT '',
+  type TEXT
 );
 
--- Insert Demo Users
-INSERT INTO users (id, username, password, name, role, teamId, avatar) VALUES
-('u1', 'admin', 'dashomes', 'Akrem Seud', 'System Administrator', NULL, NULL),
-('u2', 'manager', 'dashomes', 'Akrem Seud', 'Property & Broker Manager', NULL, NULL),
-('u3', 'agent', 'dashomes', 'Front Desk Operator', 'Call Center Operator', NULL, NULL),
-('u4', 'team1', 'dashomes', 'Team Falcon', 'Team Member (Field Agent)', 't1', NULL),
-('u5', 'team2', 'dashomes', 'Team Sheba', 'Team Member (Field Agent)', 't2', NULL),
-('u6', 'team3', 'dashomes', 'Team Blue Nile', 'Team Member (Field Agent)', 't3', NULL),
-('u7', 'team4', 'dashomes', 'Team Clay', 'Team Member (Field Agent)', 't4', NULL);
+-- ============================================================
+-- Row Level Security — allow full access via anon key (demo app)
+-- ============================================================
+ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teams        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE brokers      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE owners       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE properties   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE followups    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity     ENABLE ROW LEVEL SECURITY;
 
--- Insert Demo Teams
-INSERT INTO teams (id, name, color, leader, members, target) VALUES
-('team_alpha', 'Bole Elite', '#3b82f6', 'Dawit M.', ARRAY['b1', 'b2', 'b5'], 15),
-('team_beta', 'CMC Specialists', '#10b981', 'Sara T.', ARRAY['b3', 'b4'], 12),
-('team_gamma', 'Luxury Villas', '#8b5cf6', 'Mikias A.', ARRAY['b6'], 8);
+CREATE POLICY "anon_all" ON users        FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON teams        FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON brokers      FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON owners       FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON properties   FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON appointments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON followups    FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all" ON activity     FOR ALL USING (true) WITH CHECK (true);
 
--- Insert Demo Brokers
-INSERT INTO brokers (id, name, phone, teamId, status, rating, active_deals, avatar) VALUES
-('b1', 'Dawit M.', '+251 911 234567', 'team_alpha', 'Active', 4.8, 3, 'https://i.pravatar.cc/150?u=b1'),
-('b2', 'Sara T.', '+251 922 345678', 'team_beta', 'Busy', 4.9, 5, 'https://i.pravatar.cc/150?u=b2'),
-('b3', 'Yosef K.', '+251 933 456789', 'team_beta', 'Offline', 4.5, 1, 'https://i.pravatar.cc/150?u=b3'),
-('b4', 'Beti A.', '+251 944 567890', 'team_beta', 'Active', 4.7, 2, 'https://i.pravatar.cc/150?u=b4'),
-('b5', 'Nahom D.', '+251 955 678901', 'team_alpha', 'Active', 4.6, 4, 'https://i.pravatar.cc/150?u=b5'),
-('b6', 'Mikias A.', '+251 966 789012', 'team_gamma', 'Active', 5.0, 2, 'https://i.pravatar.cc/150?u=b6');
+-- ============================================================
+-- Seed Data: Demo Users
+-- ============================================================
+INSERT INTO users (u, p, name, role, team_id) VALUES
+  ('admin',   'dashomes', 'Akrem Seud',          'System Administrator',        NULL),
+  ('manager', 'dashomes', 'Akrem Seud',          'Property & Broker Manager',   NULL),
+  ('agent',   'dashomes', 'Front Desk Operator', 'Call Center Operator',         NULL),
+  ('team1',   'dashomes', 'Team Falcon',         'Team Member (Field Agent)',    't1'),
+  ('team2',   'dashomes', 'Team Sheba',          'Team Member (Field Agent)',    't2'),
+  ('team3',   'dashomes', 'Team Blue Nile',      'Team Member (Field Agent)',    't3'),
+  ('team4',   'dashomes', 'Team Clay',           'Team Member (Field Agent)',    't4');
 
--- Insert Demo Properties
-INSERT INTO properties (id, ownerId, type, status, price, location, lat, lng, bedrooms, bathrooms, area, furnished, amenities, photos, listedDate) VALUES
-('p1', 'o1', 'Apartment', 'Available', 45000, 'Bole Atlas', 9.001, 38.785, 2, 2, 120, true, ARRAY['Generator', 'WiFi', 'Security'], ARRAY['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267'], '2024-05-15'),
-('p2', 'o2', 'Villa', 'Pending', 120000, 'CMC', 9.020, 38.830, 4, 3, 350, false, ARRAY['Garden', 'Parking', 'Maid Room'], ARRAY['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9'], '2024-05-18'),
-('p3', 'o1', 'Condominium', 'Available', 25000, 'Ayat', 9.015, 38.860, 2, 1, 85, false, ARRAY['Parking'], ARRAY['https://images.unsplash.com/photo-1560448204-e02f11c3d0e2'], '2024-05-20'),
-('p4', 'o3', 'Commercial', 'Available', 150000, 'Kazanchis', 9.012, 38.770, 0, 4, 500, false, ARRAY['Elevator', 'Security', 'Parking'], ARRAY['https://images.unsplash.com/photo-1497366216548-37526070297c'], '2024-05-22'),
-('p5', 'o2', 'Apartment', 'Sold', 60000, 'Bole Rwanda', 8.995, 38.790, 3, 2, 150, true, ARRAY['Gym', 'Generator', 'Security'], ARRAY['https://images.unsplash.com/photo-1512917774080-9991f1c4c750'], '2024-05-10');
+-- Seed Data: Demo Teams
+INSERT INTO teams (id, name, color, lead, phone, date, members) VALUES
+  ('t1', 'Team Falcon',    '#2E4632', 'Yonas Alemu',    '+251 91 555 0101', CURRENT_DATE::TEXT, '[{"id":"m1","name":"Yonas Alemu","phone":"+251 91 555 0101"},{"id":"m2","name":"Kassahun Bekele","phone":"+251 91 555 0109"}]'::jsonb),
+  ('t2', 'Team Sheba',     '#B8862B', 'Meron Tadesse',  '+251 92 555 0202', CURRENT_DATE::TEXT, '[{"id":"m3","name":"Meron Tadesse","phone":"+251 92 555 0202"},{"id":"m4","name":"Sintayehu Tesfaye","phone":"+251 92 555 0208"}]'::jsonb),
+  ('t3', 'Team Blue Nile', '#3A6B94', 'Dawit Tesfaye',  '+251 93 555 0303', CURRENT_DATE::TEXT, '[{"id":"m5","name":"Dawit Tesfaye","phone":"+251 93 555 0303"}]'::jsonb),
+  ('t4', 'Team Clay',      '#B65C3E', 'Hanna Girma',    '+251 94 555 0404', CURRENT_DATE::TEXT, '[{"id":"m6","name":"Hanna Girma","phone":"+251 94 555 0404"}]'::jsonb);
 
--- Insert Demo Owners
-INSERT INTO owners (id, name, phone, type, rating, properties) VALUES
-('o1', 'Sunshine Real Estate', '+251 115 123456', 'Developer', 4.5, 24),
-('o2', 'Abebe Kebede', '+251 911 987654', 'Private', 4.2, 3),
-('o3', 'Ethio Properties', '+251 116 234567', 'Agency', 4.8, 15);
+-- Seed Data: Demo Owners
+INSERT INTO owners (id, name, phone, notes) VALUES
+  ('o1', 'Ato Kebede',           '+251 91 234 5678', 'Summit Residential — prefers calls after 4 PM'),
+  ('o2', 'W/ro Almaz Tesfaye',   '+251 92 987 6543', 'Megenagna Corner; negotiating terms'),
+  ('o3', 'Ato Tadesse Worku',    '+251 91 445 2211', 'Bole Vista townhouses'),
+  ('o4', 'W/ro Selam Girma',     '+251 93 812 3490', 'Kazanchis Plaza owner'),
+  ('o5', 'Ato Dawit Bekele',     '+251 94 660 1287', 'CMC Michael Park developer rep');

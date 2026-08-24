@@ -352,44 +352,43 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
   }
 
   try {
-    let remoteData = await fetchDatabaseFromSupabase();
+    const remoteData = await fetchDatabaseFromSupabase();
 
     if (!remoteData) {
+      // Supabase returned nothing — push local state up so other devices can see it
+      saveDatabaseToSupabase(localData);
       return localData;
     }
 
-    remoteData = normalizeAppointments(remoteData);
+    const normalized = normalizeAppointments(remoteData);
 
-    // Smart fail-safe merge: combine local and remote records so user data is never lost on refresh
-    const mergeById = <T extends Record<string, any>>(localArr: T[] = [], remoteArr: T[] = [], key: string = 'id'): T[] => {
-      const map = new Map<string, T>();
-      (remoteArr || []).forEach(item => {
-        const k = item[key];
-        if (k != null) map.set(String(k), item);
-      });
-      (localArr || []).forEach(item => {
-        const k = item[key];
-        if (k != null) {
-          // Local records take precedence to prevent overwriting newly added items
-          map.set(String(k), { ...map.get(String(k)), ...item });
-        }
-      });
-      return Array.from(map.values());
+    // Supabase is the source of truth.
+    // Use remote data, but ensure seed user accounts always exist.
+    const seed = getSeedData();
+    const users = [...(normalized.users || [])];
+    seed.users.forEach(su => {
+      if (!users.find(u => u.u === su.u)) {
+        users.push(su);
+      }
+    });
+
+    const finalData: DatabaseSchema = {
+      users: users.length ? users : seed.users,
+      teams: normalized.teams?.length ? normalized.teams : seed.teams,
+      brokers: (normalized.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id)),
+      owners: normalized.owners || [],
+      properties: normalized.properties || [],
+      appointments: normalized.appointments || [],
+      followups: normalized.followups || [],
+      activity: normalized.activity || []
     };
 
-    const mergedData: DatabaseSchema = {
-      users: mergeById(localData.users, remoteData.users, 'u'),
-      teams: mergeById(localData.teams, remoteData.teams, 'id'),
-      brokers: mergeById(localData.brokers, remoteData.brokers, 'id').filter(b => !SEED_BROKER_IDS.has(b.id)),
-      owners: mergeById(localData.owners, remoteData.owners, 'id'),
-      properties: mergeById(localData.properties, remoteData.properties, 'id'),
-      appointments: mergeById(localData.appointments, remoteData.appointments, 'id'),
-      followups: mergeById(localData.followups, remoteData.followups, 'id'),
-      activity: mergeById(localData.activity, remoteData.activity, 'id')
-    };
+    // Cache to localStorage for instant hydration on next page load
+    try {
+      localStorage.setItem(KEY, JSON.stringify(finalData));
+    } catch (_) { /* quota exceeded — non-fatal */ }
 
-    saveDatabase(mergedData);
-    return mergedData;
+    return finalData;
   } catch (e) {
     console.error('Error during database async sync:', e);
     return localData;
