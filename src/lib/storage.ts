@@ -174,73 +174,40 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
     const remoteData = await fetchDatabaseFromSupabase();
 
     if (!remoteData) {
-      // Supabase returned nothing — push local state up so other devices can see it
-      saveDatabaseToSupabase(localData);
+      // Supabase returned null or error — fallback to local cache
       return localData;
     }
 
     const normalized = normalizeAppointments(remoteData);
-
-    // ── MERGE local + remote: take the UNION by PK so data NEVER disappears ──
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mergeById = <T extends Record<string, any>>(
-      localArr: T[] = [], remoteArr: T[] = [], key: string = 'id'
-    ): T[] => {
-      const map = new Map<string, T>();
-      // Remote records go in first
-      for (const item of (remoteArr || [])) {
-        const k = item[key];
-        if (k != null) map.set(String(k), item);
-      }
-      // Local records overwrite (they have the latest user edits)
-      for (const item of (localArr || [])) {
-        const k = item[key];
-        if (k != null) {
-          const existing = map.get(String(k));
-          map.set(String(k), existing ? { ...existing, ...item } : item);
-        }
-      }
-      return Array.from(map.values());
-    };
-
-    // Ensure seed user accounts always exist
     const seed = getSeedData();
-    const mergedUsers = mergeById(localData.users, normalized.users, 'u');
+
+    // Ensure required seed user accounts always exist in memory/app
+    const users = [...(normalized.users || [])];
     seed.users.forEach(su => {
-      if (!mergedUsers.find(u => u.u === su.u)) {
-        mergedUsers.push(su);
+      if (!users.find(u => u.u === su.u)) {
+        users.push(su);
       }
     });
 
-    // Merge activity by timestamp (no PK — use the longer/more recent set)
-    const localActivity = localData.activity || [];
-    const remoteActivity = normalized.activity || [];
-    const mergedActivity = localActivity.length >= remoteActivity.length
-      ? localActivity
-      : remoteActivity;
-
-    const mergedData: DatabaseSchema = {
-      users: mergedUsers.length ? mergedUsers : seed.users,
-      teams: mergeById(localData.teams, normalized.teams, 'id'),
-      brokers: mergeById(localData.brokers, normalized.brokers, 'id')
-        .filter(b => !SEED_BROKER_IDS.has(b.id)),
-      owners: mergeById(localData.owners, normalized.owners, 'id'),
-      properties: mergeById(localData.properties, normalized.properties, 'id'),
-      appointments: mergeById(localData.appointments, normalized.appointments, 'id'),
-      followups: mergeById(localData.followups, normalized.followups, 'id'),
-      activity: mergedActivity
+    // Supabase is the single source of truth for all devices.
+    // Deletions and updates on one device will properly sync to all other devices.
+    const syncData: DatabaseSchema = {
+      users: users.length ? users : seed.users,
+      teams: normalized.teams?.length ? normalized.teams : seed.teams,
+      brokers: (normalized.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id)),
+      owners: normalized.owners || [],
+      properties: normalized.properties || [],
+      appointments: normalized.appointments || [],
+      followups: normalized.followups || [],
+      activity: normalized.activity || []
     };
 
-    // Ensure teams fallback
-    if (!mergedData.teams.length) mergedData.teams = seed.teams;
-
-    // Save merged result to BOTH localStorage and Supabase (bidirectional sync)
+    // Cache to localStorage for instant hydration on page refresh
     try {
-      localStorage.setItem(KEY, JSON.stringify(mergedData));
+      localStorage.setItem(KEY, JSON.stringify(syncData));
     } catch (_) { /* quota exceeded — non-fatal */ }
-    saveDatabaseToSupabase(mergedData);
 
-    return mergedData;
+    return syncData;
   } catch (e) {
     console.error('Error during database async sync:', e);
     return localData;

@@ -60,10 +60,25 @@ export default function Home() {
     setDb(loadDatabase());
     setSession(loadSession());
 
-    // Async fetch from Supabase (if configured)
-    loadDatabaseAsync().then((remoteDb: DatabaseSchema) => {
-      if (remoteDb) setDb(remoteDb);
-    });
+    const syncRemote = () => {
+      loadDatabaseAsync().then((remoteDb: DatabaseSchema) => {
+        if (remoteDb) setDb(remoteDb);
+      });
+    };
+
+    // Async fetch from Supabase on mount
+    syncRemote();
+
+    // Auto-sync when user returns to tab/window
+    window.addEventListener('focus', syncRemote);
+
+    // Periodic 8-second background polling for live cross-device sync
+    const intervalId = setInterval(syncRemote, 8000);
+
+    return () => {
+      window.removeEventListener('focus', syncRemote);
+      clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {
