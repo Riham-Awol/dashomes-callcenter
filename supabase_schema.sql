@@ -188,11 +188,3 @@ INSERT INTO teams (id, name, color, lead, phone, date, members) VALUES
   ('t2', 'Team Sheba',     '#B8862B', 'Meron Tadesse',  '+251 92 555 0202', CURRENT_DATE::TEXT, '[{"id":"m3","name":"Meron Tadesse","phone":"+251 92 555 0202"},{"id":"m4","name":"Sintayehu Tesfaye","phone":"+251 92 555 0208"}]'::jsonb),
   ('t3', 'Team Blue Nile', '#3A6B94', 'Dawit Tesfaye',  '+251 93 555 0303', CURRENT_DATE::TEXT, '[{"id":"m5","name":"Dawit Tesfaye","phone":"+251 93 555 0303"}]'::jsonb),
   ('t4', 'Team Clay',      '#B65C3E', 'Hanna Girma',    '+251 94 555 0404', CURRENT_DATE::TEXT, '[{"id":"m6","name":"Hanna Girma","phone":"+251 94 555 0404"}]'::jsonb);
-
--- Seed Data: Demo Owners
-INSERT INTO owners (id, name, phone, notes) VALUES
-  ('o1', 'Ato Kebede',           '+251 91 234 5678', 'Summit Residential — prefers calls after 4 PM'),
-  ('o2', 'W/ro Almaz Tesfaye',   '+251 92 987 6543', 'Megenagna Corner; negotiating terms'),
-  ('o3', 'Ato Tadesse Worku',    '+251 91 445 2211', 'Bole Vista townhouses'),
-  ('o4', 'W/ro Selam Girma',     '+251 93 812 3490', 'Kazanchis Plaza owner'),
-  ('o5', 'Ato Dawit Bekele',     '+251 94 660 1287', 'CMC Michael Park developer rep');
