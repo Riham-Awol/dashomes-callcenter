@@ -328,7 +328,7 @@ export function BrokersView({
             <button className="btn btn-ghost" onClick={() => setSelectedBrokerPortfolio(null)}>
               Close Portfolio
             </button>
-            {selectedBrokerPortfolio && (
+            {selectedBrokerPortfolio && session.role !== 'Team Member (Field Agent)' && (
               <button
                 className="btn btn-pri"
                 onClick={() => {

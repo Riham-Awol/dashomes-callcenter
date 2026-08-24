@@ -282,6 +282,54 @@ export function ScheduleView({
     }
   };
 
+  // Manual Add Schedule Modal State (for Manager Akrem / Operator / Admin)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manTeamId, setManTeamId] = useState('');
+  const [manTitle, setManTitle] = useState('');
+  const [manAddress, setManAddress] = useState('');
+  const [manPhone, setManPhone] = useState('');
+  const [manTime, setManTime] = useState('10:00 AM');
+  const [manNotes, setManNotes] = useState('');
+  const [manDate, setManDate] = useState(todayYMD());
+
+  const canManageSchedule = session.role === 'System Administrator' || session.role === 'Property & Broker Manager' || session.role === 'Call Center Operator';
+
+  const handleSaveManualSchedule = () => {
+    if (!manTitle.trim() || !manAddress.trim()) {
+      return onToast('Visit title and address are required.', true);
+    }
+    const targetTeam = db.teams.find(t => t.id === manTeamId) || db.teams[0];
+    if (!targetTeam) {
+      return onToast('Please select a team.', true);
+    }
+
+    onUpdateDatabase(draft => {
+      draft.appointments.push({
+        id: uid(),
+        name: manTitle.trim(),
+        address: manAddress.trim(),
+        phone: manPhone.trim() || '+251 91 100 2233',
+        kind: 'owner',
+        dt: `${manDate}T${manTime.includes(':') ? manTime.replace(' AM', ':00').replace(' PM', ':00') : '10:00:00'}`,
+        status: 'Scheduled',
+        teamId: targetTeam.id,
+        contactId: '',
+        propId: '',
+        notes: manNotes.trim() || 'Manual schedule assignment by manager',
+        isShoot: true,
+        assignedMembersSnapshot: targetTeam.members || []
+      });
+
+      draft.activity.unshift({
+        ts: Date.now(),
+        text: `Manual Schedule Entry Added by ${session.name} for ${targetTeam.name}: ${manTitle.trim()} at ${manAddress.trim()}`
+      });
+    });
+
+    setIsManualModalOpen(false);
+    onToast(`Manual schedule visit added for ${targetTeam.name} ✓`);
+  };
+
   return (
     <section className="view on" id="view-schedule">
       <div className="pagehead rise">
@@ -328,10 +376,26 @@ export function ScheduleView({
           <button className="btn btn-sec" onClick={handleToday}>
             ● Today
           </button>
-          {isOperator && (
-            <button className="btn btn-gold" onClick={handleGenerateTomorrow}>
-              📅 Generate Tomorrow's Schedule
-            </button>
+          {canManageSchedule && (
+            <>
+              <button className="btn btn-gold" onClick={handleGenerateTomorrow}>
+                📅 Generate Tomorrow
+              </button>
+              <button
+                className="btn btn-sec"
+                onClick={() => {
+                  setManTeamId(selectedTeamIdFilter !== 'all' ? selectedTeamIdFilter : db.teams[0]?.id || '');
+                  setManDate(selDay);
+                  setManTitle('');
+                  setManAddress('');
+                  setManPhone('');
+                  setManNotes('');
+                  setIsManualModalOpen(true);
+                }}
+              >
+                ＋ Manual Add Schedule
+              </button>
+            </>
           )}
           {['System Administrator', 'Call Center Operator'].includes(session.role) && (
             <button className="btn btn-pri" onClick={() => onOpenApptModal(null, { dt: selDay + 'T10:00' })}>
@@ -833,6 +897,109 @@ export function ScheduleView({
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Manual Add Schedule Modal for Manager / Admin */}
+      <Modal
+        isOpen={isManualModalOpen}
+        title="＋ Manual Add Schedule Visit"
+        onClose={() => setIsManualModalOpen(false)}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setIsManualModalOpen(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-pri" onClick={handleSaveManualSchedule}>
+              Assign Schedule Entry
+            </button>
+          </>
+        }
+      >
+        <div className="fgrid">
+          <div className="fld">
+            <label>Assigned Field Team *</label>
+            <select
+              className="inp"
+              value={manTeamId}
+              onChange={e => setManTeamId(e.target.value)}
+            >
+              {db.teams.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.lead || 'Team Lead'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="fld">
+            <label>Schedule Date *</label>
+            <input
+              type="date"
+              className="inp"
+              value={manDate}
+              onChange={e => setManDate(e.target.value)}
+            />
+          </div>
+
+          <div className="fld full">
+            <label>Property / Visit Title *</label>
+            <input
+              type="text"
+              className="inp"
+              placeholder="e.g. Bole Atlas Apartment 4B Shoot"
+              value={manTitle}
+              onChange={e => setManTitle(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="fld full">
+            <label>Street Address / Location *</label>
+            <input
+              type="text"
+              className="inp"
+              placeholder="e.g. Bole Road, near Atlas Hotel"
+              value={manAddress}
+              onChange={e => setManAddress(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="fld">
+            <label>Contact Phone Number</label>
+            <input
+              type="tel"
+              className="inp"
+              placeholder="+251 9..."
+              value={manPhone}
+              onChange={e => setManPhone(e.target.value)}
+            />
+          </div>
+
+          <div className="fld">
+            <label>Assigned Time Slot</label>
+            <select
+              className="inp"
+              value={manTime}
+              onChange={e => setManTime(e.target.value)}
+            >
+              {['08:30 AM', '09:00 AM', '10:00 AM', '11:00 AM', '01:30 PM', '02:30 PM', '04:00 PM'].map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="fld full">
+            <label>Instructions & Notes for Team</label>
+            <textarea
+              className="inp"
+              rows={3}
+              placeholder="Special shoot preferences, key contact details..."
+              value={manNotes}
+              onChange={e => setManNotes(e.target.value)}
+            />
+          </div>
+        </div>
       </Modal>
     </section>
   );

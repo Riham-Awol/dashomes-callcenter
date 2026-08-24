@@ -198,6 +198,7 @@ export default function Home() {
           {currentView === 'appointments' && (
             <AppointmentsView
               db={db}
+              session={session}
               searchQuery={searchQuery}
               onUpdateDatabase={updateDatabase}
               onToast={showToast}

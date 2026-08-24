@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Appointment, AppointmentStatus, DatabaseSchema } from '@/types';
+import { Appointment, AppointmentStatus, DatabaseSchema, Session } from '@/types';
 import { balanceTeamWorkload, exportCSV, exportToWordDoc, findNearbyAppointments, fmtDate, fmtTime, isToday, todayYMD, uid } from '@/lib/utils';
 import { Icon } from '@/lib/icons';
 import { Modal } from '@/components/ui/Modal';
@@ -9,6 +9,7 @@ import { MapPinPicker } from '@/components/ui/MapPinPicker';
 
 interface AppointmentsViewProps {
   db: DatabaseSchema;
+  session?: Session;
   searchQuery: string;
   onUpdateDatabase: (updater: (draft: DatabaseSchema) => void) => void;
   onToast: (msg: string, isErr?: boolean) => void;
@@ -22,6 +23,7 @@ interface AppointmentsViewProps {
 
 export function AppointmentsView({
   db,
+  session,
   searchQuery,
   onUpdateDatabase,
   onToast,
@@ -243,9 +245,11 @@ export function AppointmentsView({
           <button className="btn btn-ghost" onClick={() => exportCSV('appointments', db)}>
             ⇩ Export CSV
           </button>
-          <button className="btn btn-pri" onClick={() => onOpenModal(null)}>
-            ＋ Book Appointment
-          </button>
+          {session?.role !== 'Team Member (Field Agent)' && (
+            <button className="btn btn-pri" onClick={() => onOpenModal(null)}>
+              ＋ Book Appointment
+            </button>
+          )}
         </div>
       </div>
 

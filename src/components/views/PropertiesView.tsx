@@ -316,6 +316,9 @@ export function PropertiesView({
       <div className="chiprow rise" style={{ animationDelay: '.08s', marginBottom: '16px' }}>
         {[
           ['all', 'All'],
+          ['Pending', '⏳ Pending Approval'],
+          ['Approved', '✓ Approved'],
+          ['Rejected', '✕ Rejected'],
           ['rent', 'For Rent'],
           ['sale', 'For Sale'],
           ['Apartment', 'Apartments'],
@@ -350,7 +353,7 @@ export function PropertiesView({
                       {p.type === 'Other' ? p.customType || 'Other' : p.type}
                     </span>
                     <span className={`chip ${status === 'Approved' ? 'ch-green' : status === 'Pending' ? 'ch-gold' : 'ch-clay'}`} style={{ border: 'none' }}>
-                      {status}
+                      {status === 'Pending' ? '⏳ Pending Approval' : status}
                     </span>
                   </div>
                   {!displayPhoto && <span className="noph">NO COVER PHOTO</span>}
@@ -427,16 +430,18 @@ export function PropertiesView({
                 </button>
               </>
             )}
-            <button
-              className="btn btn-sec"
-              onClick={() => {
-                const pr = selectedProp!;
-                setSelectedProp(null);
-                onBookShootForProperty(pr);
-              }}
-            >
-              📷 Book photo shoot
-            </button>
+            {session.role !== 'Team Member (Field Agent)' && (
+              <button
+                className="btn btn-sec"
+                onClick={() => {
+                  const pr = selectedProp!;
+                  setSelectedProp(null);
+                  onBookShootForProperty(pr);
+                }}
+              >
+                📷 Book photo shoot
+              </button>
+            )}
             <button
               className="btn btn-pri"
               onClick={() => {
