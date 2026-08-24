@@ -12,9 +12,10 @@ interface TopbarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onNewAppointment: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
-export function Topbar({ db, session, currentView, searchQuery, onSearchChange, onNewAppointment }: TopbarProps) {
+export function Topbar({ db, session, currentView, searchQuery, onSearchChange, onNewAppointment, onToggleMobileMenu }: TopbarProps) {
   const [clock, setClock] = useState('');
 
   const meta = VIEWS_META.find(x => x[0] === currentView) || VIEWS_META[0];
@@ -53,10 +54,24 @@ export function Topbar({ db, session, currentView, searchQuery, onSearchChange, 
 
   return (
     <header id="topbar">
-      <div>
-        <h1 id="topTitle">{meta[1]}</h1>
-        <div className="sub" id="topSub">
-          {meta[3]}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          className="hamburger-btn"
+          onClick={onToggleMobileMenu}
+          title="Toggle Navigation Menu"
+          aria-label="Open menu"
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="18" x2="20" y2="18" />
+          </svg>
+        </button>
+        <div>
+          <h1 id="topTitle">{meta[1]}</h1>
+          <div className="sub" id="topSub">
+            {meta[3]}
+          </div>
         </div>
       </div>
 

@@ -40,6 +40,9 @@ export default function Home() {
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
   const [apptPrefill, setApptPrefill] = useState<Partial<Appointment> | null>(null);
 
+  // Mobile Drawer State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Map Redirection & Focus State
   const [focusedMapLocation, setFocusedMapLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
 
@@ -169,6 +172,8 @@ export default function Home() {
         todayApptCount={todayApptCount}
         onResetData={handleResetData}
         onLogout={handleLogout}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       <main id="main">
@@ -178,6 +183,7 @@ export default function Home() {
           currentView={currentView}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
           onNewAppointment={() => {
             setCurrentView('appointments');
             handleOpenApptModal(null);
