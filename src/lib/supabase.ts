@@ -13,9 +13,19 @@ export const isSupabaseConfigured = (): boolean => {
   );
 };
 
-export const supabase: SupabaseClient | null = isSupabaseConfigured()
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// ─── Singleton Supabase client (avoids multiple GoTrueClient instances) ──
+let _supabaseInstance: SupabaseClient | null = null;
+
+export function getSupabase(): SupabaseClient | null {
+  if (!isSupabaseConfigured()) return null;
+  if (!_supabaseInstance) {
+    _supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return _supabaseInstance;
+}
+
+// Backward-compat export
+export const supabase = getSupabase();
 
 // ─── Snake ↔ Camel case converters ────────────────────────────
 function camelToSnake(str: string): string {
@@ -46,7 +56,8 @@ function rowToCamel(obj: any): any {
 
 // ─── Fetch all tables from Supabase ───────────────────────────
 export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null> {
-  if (!supabase) return null;
+  const sb = getSupabase();
+  if (!sb) return null;
 
   try {
     const [
@@ -59,14 +70,14 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
       { data: followups, error: e7 },
       { data: activity, error: e8 }
     ] = await Promise.all([
-      supabase.from('users').select('*'),
-      supabase.from('teams').select('*'),
-      supabase.from('brokers').select('*'),
-      supabase.from('owners').select('*'),
-      supabase.from('properties').select('*'),
-      supabase.from('appointments').select('*'),
-      supabase.from('followups').select('*'),
-      supabase.from('activity').select('*')
+      sb.from('users').select('*'),
+      sb.from('teams').select('*'),
+      sb.from('brokers').select('*'),
+      sb.from('owners').select('*'),
+      sb.from('properties').select('*'),
+      sb.from('appointments').select('*'),
+      sb.from('followups').select('*'),
+      sb.from('activity').select('*')
     ]);
 
     const errors = [e1, e2, e3, e4, e5, e6, e7, e8].filter(Boolean);
@@ -84,10 +95,10 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
       properties: (properties || []).map(rowToCamel),
       appointments: (appointments || []).map(rowToCamel),
       followups: (followups || []).map(rowToCamel),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       activity: (activity || []).map((r: any) => {
-        // Activity rows have a synthetic `id` column in DB — strip it for the app
         const mapped = rowToCamel(r);
-        delete mapped.id;
+        delete mapped.id; // strip synthetic DB id
         return mapped;
       })
     } as DatabaseSchema;
@@ -99,10 +110,10 @@ export async function fetchDatabaseFromSupabase(): Promise<DatabaseSchema | null
 
 // ─── Save complete state snapshot to Supabase ─────────────────
 export async function saveDatabaseToSupabase(data: DatabaseSchema): Promise<boolean> {
-  if (!supabase) return false;
+  const sb = getSupabase();
+  if (!sb) return false;
 
   try {
-    // Map camelCase app objects → snake_case DB rows
     const usersRows = data.users.map(rowToSnake);
     const teamsRows = data.teams.map(rowToSnake);
     const brokersRows = data.brokers.map(rowToSnake);
@@ -119,21 +130,20 @@ export async function saveDatabaseToSupabase(data: DatabaseSchema): Promise<bool
       type: a.type || null
     }));
 
-    // ── Upsert all tables in parallel ──
     const results = await Promise.all([
-      upsertTable(supabase, 'users', usersRows, 'u', data.users.map(u => u.u)),
-      upsertTable(supabase, 'teams', teamsRows, 'id', data.teams.map(t => t.id)),
-      upsertTable(supabase, 'brokers', brokersRows, 'id', data.brokers.map(b => b.id)),
-      upsertTable(supabase, 'owners', ownersRows, 'id', data.owners.map(o => o.id)),
-      upsertTable(supabase, 'properties', propsRows, 'id', data.properties.map(p => p.id)),
-      upsertTable(supabase, 'appointments', apptsRows, 'id', data.appointments.map(a => a.id)),
-      upsertTable(supabase, 'followups', fuRows, 'id', data.followups.map(f => f.id)),
-      replaceActivity(supabase, actRows)
+      upsertTable(sb, 'users', usersRows, 'u', data.users.map(u => u.u)),
+      upsertTable(sb, 'teams', teamsRows, 'id', data.teams.map(t => t.id)),
+      upsertTable(sb, 'brokers', brokersRows, 'id', data.brokers.map(b => b.id)),
+      upsertTable(sb, 'owners', ownersRows, 'id', data.owners.map(o => o.id)),
+      upsertTable(sb, 'properties', propsRows, 'id', data.properties.map(p => p.id)),
+      upsertTable(sb, 'appointments', apptsRows, 'id', data.appointments.map(a => a.id)),
+      upsertTable(sb, 'followups', fuRows, 'id', data.followups.map(f => f.id)),
+      replaceActivity(sb, actRows)
     ]);
 
     const hasErrors = results.some(r => r === false);
     if (hasErrors) {
-      console.warn('Some Supabase upserts had errors (see above).');
+      console.warn('Some Supabase upserts had errors (see console).');
     }
     return !hasErrors;
   } catch (err) {
@@ -144,10 +154,6 @@ export async function saveDatabaseToSupabase(data: DatabaseSchema): Promise<bool
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-/**
- * Upsert rows into a table, then delete any rows whose PK is not in currentIds.
- * This handles adds, updates, AND deletes.
- */
 async function upsertTable(
   sb: SupabaseClient,
   table: string,
@@ -157,7 +163,6 @@ async function upsertTable(
   currentIds: string[]
 ): Promise<boolean> {
   try {
-    // Upsert current rows
     if (rows.length > 0) {
       const { error: upsertErr } = await sb.from(table).upsert(rows, { onConflict: pkColumn });
       if (upsertErr) {
@@ -176,7 +181,6 @@ async function upsertTable(
         console.error(`Supabase delete-stale error on ${table}:`, delErr);
       }
     } else {
-      // If no current rows, delete everything
       const { error: delErr } = await sb.from(table).delete().neq(pkColumn, '___impossible___');
       if (delErr) {
         console.error(`Supabase delete-all error on ${table}:`, delErr);
@@ -189,19 +193,13 @@ async function upsertTable(
   }
 }
 
-/**
- * Replace all activity rows (delete all, then insert fresh).
- */
 async function replaceActivity(
   sb: SupabaseClient,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows: Record<string, any>[]
 ): Promise<boolean> {
   try {
-    // Delete all existing activity
     await sb.from('activity').delete().neq('id', '___impossible___');
-
-    // Insert fresh
     if (rows.length > 0) {
       const { error } = await sb.from('activity').insert(rows);
       if (error) {
