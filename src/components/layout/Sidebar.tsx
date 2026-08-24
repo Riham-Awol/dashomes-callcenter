@@ -81,7 +81,7 @@ export function Sidebar({
               return ['brokers', 'properties', 'teams', 'schedule', 'analytics'].includes(id);
             }
             if (role === 'Call Center Operator') {
-              return ['dashboard', 'appointments', 'schedule', 'map', 'followups', 'teams', 'analytics'].includes(id);
+              return ['dashboard', 'appointments', 'schedule', 'map', 'brokers', 'properties', 'followups', 'teams', 'analytics'].includes(id);
             }
             if (role === 'Team Member (Field Agent)') {
               return ['schedule', 'map', 'brokers', 'properties'].includes(id);
