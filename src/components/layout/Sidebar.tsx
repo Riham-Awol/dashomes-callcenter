@@ -10,7 +10,6 @@ interface SidebarProps {
   session: Session;
   overdueCount: number;
   todayApptCount: number;
-  onResetData: () => void;
   onLogout: () => void;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -35,7 +34,6 @@ export function Sidebar({
   session,
   overdueCount,
   todayApptCount,
-  onResetData,
   onLogout,
   isOpenMobile,
   onCloseMobile
@@ -120,9 +118,6 @@ export function Sidebar({
             </div>
           </div>
           <div className="side-links">
-            <button onClick={() => { onResetData(); if (onCloseMobile) onCloseMobile(); }} title="Reset demo data">
-              ↺ Reset data
-            </button>
             <button onClick={() => { onLogout(); if (onCloseMobile) onCloseMobile(); }}>Logout</button>
           </div>
         </div>

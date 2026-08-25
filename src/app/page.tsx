@@ -185,7 +185,6 @@ export default function Home() {
         session={session}
         overdueCount={overdueCount}
         todayApptCount={todayApptCount}
-        onResetData={handleResetData}
         onLogout={handleLogout}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
