@@ -152,6 +152,19 @@ export async function saveDatabaseToSupabase(data: DatabaseSchema): Promise<bool
   }
 }
 
+export async function deleteRecordFromSupabase(table: string, pkColumn: string, id: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  try {
+    const { error } = await sb.from(table).delete().eq(pkColumn, id);
+    if (error) console.error(`Failed to delete record ${id} from ${table}:`, error);
+    return !error;
+  } catch (e) {
+    console.error(`Error deleting from ${table}:`, e);
+    return false;
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 
 async function upsertTable(
@@ -169,23 +182,20 @@ async function upsertTable(
         console.error(`Supabase upsert error on ${table}:`, upsertErr);
         return false;
       }
-    }
 
-    // Delete rows that no longer exist in the app state
-    if (currentIds.length > 0) {
-      const { error: delErr } = await sb
-        .from(table)
-        .delete()
-        .not(pkColumn, 'in', `(${currentIds.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')})`);
-      if (delErr) {
-        console.error(`Supabase delete-stale error on ${table}:`, delErr);
-      }
-    } else {
-      const { error: delErr } = await sb.from(table).delete().neq(pkColumn, '___impossible___');
-      if (delErr) {
-        console.error(`Supabase delete-all error on ${table}:`, delErr);
+      // Delete stale rows that were removed from app state, but ONLY if we have an active dataset
+      if (currentIds.length > 0) {
+        const { error: delErr } = await sb
+          .from(table)
+          .delete()
+          .not(pkColumn, 'in', `(${currentIds.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')})`);
+        if (delErr) {
+          console.error(`Supabase delete-stale error on ${table}:`, delErr);
+        }
       }
     }
+    // Safety: If rows is empty ([]), do NOT execute mass DELETE ALL on Supabase.
+    // Empty state should never wipe remote database automatically.
     return true;
   } catch (e) {
     console.error(`Supabase upsertTable error on ${table}:`, e);

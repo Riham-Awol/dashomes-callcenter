@@ -118,12 +118,11 @@ export function loadDatabase(): DatabaseSchema {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) {
-      saveDatabase(seed);
+      // Pure read: return seed without executing saveDatabase(seed) which wipes remote DB!
       return seed;
     }
     const data = JSON.parse(raw);
     if (!isAppDataShapeCompatible(data)) {
-      saveDatabase(seed);
       return seed;
     }
 
@@ -154,11 +153,9 @@ export function loadDatabase(): DatabaseSchema {
       activity: normalized.activity || []
     };
 
-    localStorage.setItem(KEY, JSON.stringify(finalData));
     return finalData;
   } catch (e) {
     console.error('Error loading database from localStorage:', e);
-    saveDatabase(seed);
     return seed;
   }
 }
@@ -175,6 +172,9 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
 
     if (!remoteData) {
       // Supabase returned null or error — fallback to local cache
+      if (localData.brokers.length > 0 || localData.properties.length > 0) {
+        saveDatabaseToSupabase(localData);
+      }
       return localData;
     }
 
@@ -189,18 +189,34 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
       }
     });
 
-    // Supabase is the single source of truth for all devices.
-    // Deletions and updates on one device will properly sync to all other devices.
+    // Remote data takes precedence if populated. If remote is empty but local has data, use local & sync to remote.
+    const remoteBrokers = (normalized.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id));
+    const finalBrokers = remoteBrokers.length > 0 ? remoteBrokers : localData.brokers;
+
+    const remoteProps = normalized.properties || [];
+    const finalProps = remoteProps.length > 0 ? remoteProps : localData.properties;
+
+    const remoteOwners = normalized.owners || [];
+    const finalOwners = remoteOwners.length > 0 ? remoteOwners : localData.owners;
+
     const syncData: DatabaseSchema = {
       users: users.length ? users : seed.users,
       teams: normalized.teams?.length ? normalized.teams : seed.teams,
-      brokers: (normalized.brokers || []).filter(b => !SEED_BROKER_IDS.has(b.id)),
-      owners: normalized.owners || [],
-      properties: normalized.properties || [],
-      appointments: normalized.appointments || [],
-      followups: normalized.followups || [],
-      activity: normalized.activity || []
+      brokers: finalBrokers,
+      owners: finalOwners,
+      properties: finalProps,
+      appointments: (normalized.appointments && normalized.appointments.length > 0) ? normalized.appointments : (localData.appointments || []),
+      followups: (normalized.followups && normalized.followups.length > 0) ? normalized.followups : (localData.followups || []),
+      activity: (normalized.activity && normalized.activity.length > 0) ? normalized.activity : (localData.activity || [])
     };
+
+    // If local had data that remote didn't have (e.g. newly added offline), push to Supabase
+    if (
+      (localData.brokers.length > 0 && remoteBrokers.length === 0) ||
+      (localData.properties.length > 0 && remoteProps.length === 0)
+    ) {
+      saveDatabaseToSupabase(syncData);
+    }
 
     // Cache to localStorage for instant hydration on page refresh
     try {

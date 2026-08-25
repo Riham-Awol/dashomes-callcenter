@@ -6,6 +6,8 @@ import { exportCSV, exportToWordDoc, uid } from '@/lib/utils';
 import { Icon } from '@/lib/icons';
 import { Modal } from '@/components/ui/Modal';
 
+import { deleteRecordFromSupabase } from '@/lib/supabase';
+
 interface BrokersViewProps {
   db: DatabaseSchema;
   session: Session;
@@ -82,6 +84,7 @@ export function BrokersView({
       onUpdateDatabase(draft => {
         draft.brokers = draft.brokers.filter(x => x.id !== id);
       });
+      deleteRecordFromSupabase('brokers', 'id', id);
       onToast('Deleted');
     });
   };
