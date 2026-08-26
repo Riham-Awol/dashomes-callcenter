@@ -283,13 +283,15 @@ export function generateTeamDaily15Routes(
   const balancedAppts = balanceTeamWorkload(appointments, activeTeams);
   const pins = pinnedLocations || [];
 
-  return activeTeams.map((t, teamIdx) => {
+  // ── Step 0: real bookings (appointments) per team — these are the ONLY shoots.
+  // A property counts as a shoot only when it actually has an appointment today.
+  const teamItems: TeamDaily15Route['items'][] = activeTeams.map(t => {
     const teamAppts = balancedAppts.filter(a => a.teamId === t.id && isToday(a.dt));
-    const items: TeamDaily15Route['items'] = teamAppts.map(a => ({
+    return teamAppts.map(a => ({
       id: a.id,
       title: `${a.name} (${a.kind})`,
       address: a.address,
-      kind: 'Booking',
+      kind: 'Booking' as const,
       lat: a.lat,
       lng: a.lng,
       time: a.dt ? fmtTime(a.dt) : '10:00 AM',
@@ -300,60 +302,89 @@ export function generateTeamDaily15Routes(
       incompletionReason: a.incompletionReason,
       originalAppointment: a
     }));
+  });
 
-    // Step 1: Fill with approved properties if bookings < 15
-    if (items.length < 15) {
-      const remainingNeed = 15 - items.length;
-      const unassignedProps = properties.filter(
-        p => (p.approvalStatus || 'Approved') === 'Approved' && !items.some(it => it.address === p.address)
-      );
+  // Addresses already covered by a booking on ANY team — never assign them again.
+  const bookedAddresses = new Set<string>();
+  teamItems.forEach(items =>
+    items.forEach(it => {
+      const k = (it.address || '').trim().toLowerCase();
+      if (k) bookedAddresses.add(k);
+    })
+  );
 
-      for (let i = 0; i < Math.min(remainingNeed, unassignedProps.length); i++) {
-        const pr = unassignedProps[i];
-        items.push({
-          id: `prop_fill_${t.id}_${pr.id}_${i}`,
-          title: `Property Shoot: ${pr.name}`,
+  // ── Build ONE shared, de-duplicated fill pool, then hand each team a DIFFERENT
+  // slice via round-robin — so no two teams get the same place.
+  const usedFill = new Set<string>();
+  const propFill = properties
+    .filter(p => (p.approvalStatus || 'Approved') === 'Approved')
+    .filter(p => {
+      const k = (p.address || '').trim().toLowerCase();
+      if (!k || bookedAddresses.has(k) || usedFill.has(k)) return false;
+      usedFill.add(k);
+      return true;
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map(p => ({ source: 'prop' as const, ref: p as any }));
+
+  const pinFill = pins
+    .filter(pin => {
+      const k = (pin.address || `${pin.name}|${pin.lat},${pin.lng}`).trim().toLowerCase();
+      if (usedFill.has(k)) return false;
+      usedFill.add(k);
+      return true;
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map(pin => ({ source: 'pin' as const, ref: pin as any }));
+
+  const pool = [...propFill, ...pinFill];
+
+  let cursor = 0;
+  let progressing = true;
+  while (cursor < pool.length && progressing) {
+    progressing = false;
+    for (let ti = 0; ti < activeTeams.length; ti++) {
+      if (teamItems[ti].length >= 15 || cursor >= pool.length) continue;
+      const t = activeTeams[ti];
+      const slot = teamItems[ti].length;
+      const time = `${9 + (slot % 8)}:${slot % 2 === 0 ? '00' : '30'} AM`;
+      const entry = pool[cursor++];
+      progressing = true;
+
+      if (entry.source === 'prop') {
+        const pr = entry.ref;
+        teamItems[ti].push({
+          id: `prop_fill_${t.id}_${pr.id}`,
+          title: `Property Visit: ${pr.name}`,
           address: pr.address,
           kind: 'Pinned Property',
           lat: pr.lat,
           lng: pr.lng,
-          time: `${9 + (i % 8)}:00 AM`,
+          time,
           status: 'Scheduled',
           phone: pr.phone || '+251 91 234 5678',
-          notes: pr.notes || 'Approved property intake & media capture',
+          notes: pr.notes || 'Approved property — no appointment yet (survey / intake visit)',
           contactName: pr.owner || pr.name
         });
-      }
-    }
-
-    // Step 2: Fill remaining with pinned gazetteer locations (evenly distributed across teams)
-    if (items.length < 15 && pins.length > 0) {
-      const remainingNeed = 15 - items.length;
-      const pinsPerTeam = Math.ceil(pins.length / activeTeams.length);
-      const teamPins = pins.slice(teamIdx * pinsPerTeam, (teamIdx + 1) * pinsPerTeam);
-
-      for (let i = 0; i < Math.min(remainingNeed, teamPins.length); i++) {
-        const pin = teamPins[i];
-        items.push({
-          id: `pin_fill_${t.id}_${pin.id}_${i}`,
+      } else {
+        const pin = entry.ref;
+        teamItems[ti].push({
+          id: `pin_fill_${t.id}_${pin.id}`,
           title: `📌 ${pin.name}`,
           address: pin.address || `${pin.area}, Bole Subcity`,
           kind: 'Pinned Property',
           lat: pin.lat,
           lng: pin.lng,
-          time: `${9 + (i % 8)}:${i % 2 === 0 ? '00' : '30'} AM`,
+          time,
           status: 'Scheduled',
           phone: pin.phone || '+251 91 555 7788',
-          notes: `Bole Area pinned location survey & property photo shoot (${pin.area})`,
+          notes: `Bole area pinned survey — ${pin.area} (no appointment yet)`,
           contactName: pin.name
         });
       }
     }
+  }
 
-    return {
-      team: t,
-      items: items.slice(0, 15)
-    };
-  });
+  return activeTeams.map((t, i) => ({ team: t, items: teamItems[i].slice(0, 15) }));
 }
 
