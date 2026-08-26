@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '@/lib/icons';
 
 interface ModalProps {
@@ -23,9 +24,11 @@ export function Modal({ isOpen, title, onClose, wide = false, children, footer }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  // Portal to <body> so the fixed overlay centers on the viewport and is never
+  // offset by a transformed ancestor (cards/animations use CSS transforms).
+  return createPortal(
     <div id="modalRoot">
       <div className="veil modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className={`modal ${wide ? 'wide' : ''}`}>
@@ -39,7 +42,8 @@ export function Modal({ isOpen, title, onClose, wide = false, children, footer }
           {footer && <div className="modal-f">{footer}</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -51,9 +55,9 @@ interface AskConfirmProps {
 }
 
 export function AskConfirmModal({ isOpen, message, onConfirm, onCancel }: AskConfirmProps) {
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div id="modalRoot">
       <div className="veil modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onCancel(); }}>
         <div className="modal" style={{ width: 'min(400px, 94vw)' }}>
@@ -79,6 +83,7 @@ export function AskConfirmModal({ isOpen, message, onConfirm, onCancel }: AskCon
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

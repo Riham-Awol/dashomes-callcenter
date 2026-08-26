@@ -2346,3 +2346,42 @@ textarea.inp {
   .cards { grid-template-columns: repeat(2, 1fr) !important; }
 }
 
+
+/* ============================================================
+   Forms, modals & general phone responsiveness
+   ============================================================ */
+
+/* Never let the page scroll sideways on a phone */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* Stack two-column forms on narrow screens */
+@media (max-width: 620px) {
+  .fgrid { grid-template-columns: 1fr; }
+}
+
+/* Modals: fit the phone screen, keep tap-friendly footers */
+@media (max-width: 640px) {
+  .veil, .modal-overlay { padding: 12px; }
+  .modal, .modal.wide { width: 100% !important; max-height: 90vh; }
+  .modal-h { padding: 12px 14px; }
+  .modal-h h3 { font-size: 15px; }
+  .modal-b { padding: 14px; max-height: calc(90vh - 118px); }
+  .modal-f { padding: 10px 12px; gap: 6px; }
+  .modal-f .btn { flex: 1 1 auto; justify-content: center; min-width: 0; }
+  .pk-map { height: 240px !important; }
+  .prop-stats { grid-template-columns: repeat(2, 1fr); }
+  .prop-toolbar { gap: 8px; }
+  .prop-pagesize { margin-left: auto; }
+}
+
+/* Comfortable inputs on touch devices (prevents iOS zoom-on-focus < 16px) */
+@media (max-width: 640px) {
+  .inp, select.inp, textarea.inp { font-size: 16px; padding: 10px 12px; }
+  .fld label { font-size: 9px; }
+}
+
+/* Very small phones */
+@media (max-width: 380px) {
+  .prop-stats { grid-template-columns: 1fr 1fr; }
+  .prop-viewtoggle .vt-btn { padding: 6px 10px; font-size: 11.5px; }
+}
