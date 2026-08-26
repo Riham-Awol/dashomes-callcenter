@@ -77,6 +77,16 @@ export function PropertiesView({
     );
   }
 
+  // Sort alphabetically by address (blank addresses last, tie-broken by name)
+  list = [...list].sort((a, b) => {
+    const aa = (a.address || '').trim();
+    const bb = (b.address || '').trim();
+    if (!aa && bb) return 1;
+    if (aa && !bb) return -1;
+    const addr = aa.localeCompare(bb, undefined, { sensitivity: 'base' });
+    return addr !== 0 ? addr : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+
   const handleOpenForm = (p?: Property | null) => {
     if (p) {
       setEditingProp(p);
