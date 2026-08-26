@@ -276,7 +276,7 @@ export function generateTeamDaily15Routes(
   appointments: Appointment[],
   properties: Property[],
   activeTeams: Team[],
-  pinnedLocations?: { id: string; name: string; lat: number; lng: number; area: string }[]
+  pinnedLocations?: { id: string; name: string; lat: number; lng: number; area: string; address?: string; phone?: string }[]
 ): TeamDaily15Route[] {
   if (!activeTeams || activeTeams.length === 0) return [];
 
@@ -337,13 +337,13 @@ export function generateTeamDaily15Routes(
         items.push({
           id: `pin_fill_${t.id}_${pin.id}_${i}`,
           title: `📌 ${pin.name}`,
-          address: `${pin.area}, Bole Subcity`,
+          address: pin.address || `${pin.area}, Bole Subcity`,
           kind: 'Pinned Property',
           lat: pin.lat,
           lng: pin.lng,
           time: `${9 + (i % 8)}:${i % 2 === 0 ? '00' : '30'} AM`,
           status: 'Scheduled',
-          phone: '+251 91 555 7788',
+          phone: pin.phone || '+251 91 555 7788',
           notes: `Bole Area pinned location survey & property photo shoot (${pin.area})`,
           contactName: pin.name
         });
