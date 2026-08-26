@@ -165,6 +165,43 @@ export async function deleteRecordFromSupabase(table: string, pkColumn: string, 
   }
 }
 
+// Primary-key column for each syncable table
+const TABLE_PK: Record<string, string> = {
+  users: 'u',
+  teams: 'id',
+  brokers: 'id',
+  owners: 'id',
+  properties: 'id',
+  appointments: 'id',
+  followups: 'id'
+};
+
+// ─── Propagate deletions to Supabase ──────────────────────────
+// Compares the previous vs. next app state and deletes, from Supabase, exactly
+// the rows the user removed. This is precise (never touches other rows) and
+// guarantees a delete persists — so a deleted record can't reappear after the
+// next background sync / page refresh.
+export async function syncDeletionsToSupabase(
+  prev: DatabaseSchema,
+  next: DatabaseSchema
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+
+  for (const table of Object.keys(TABLE_PK)) {
+    const pk = TABLE_PK[table];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prevRows: any[] = (prev as any)[table] || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nextRows: any[] = (next as any)[table] || [];
+    const nextIds = new Set(nextRows.map(r => r[pk]));
+    const removed = prevRows.filter(r => r[pk] != null && !nextIds.has(r[pk]));
+    for (const r of removed) {
+      await deleteRecordFromSupabase(table, pk, r[pk]);
+    }
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 
 async function upsertTable(

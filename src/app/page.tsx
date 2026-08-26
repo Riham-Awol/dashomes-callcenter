@@ -107,7 +107,9 @@ export default function Home() {
     if (!db) return;
     const clone: DatabaseSchema = JSON.parse(JSON.stringify(db));
     updater(clone);
-    saveDatabase(clone);
+    // Pass the previous state so any deleted records are removed from Supabase
+    // explicitly (otherwise the background sync would restore them).
+    saveDatabase(clone, db);
     setDb(clone);
   };
 

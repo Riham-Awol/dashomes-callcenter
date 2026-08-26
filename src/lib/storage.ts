@@ -1,6 +1,6 @@
 import { DatabaseSchema, Session } from '@/types';
 import { dOff, dtOff } from './utils';
-import { isSupabaseConfigured, fetchDatabaseFromSupabase, saveDatabaseToSupabase } from './supabase';
+import { isSupabaseConfigured, fetchDatabaseFromSupabase, saveDatabaseToSupabase, syncDeletionsToSupabase } from './supabase';
 
 export const KEY = 'dasHomesCC_v1';
 export const SESSION_KEY = 'dhs_session';
@@ -230,12 +230,18 @@ export async function loadDatabaseAsync(): Promise<DatabaseSchema> {
   }
 }
 
-export function saveDatabase(data: DatabaseSchema) {
+export function saveDatabase(data: DatabaseSchema, prev?: DatabaseSchema) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
     if (isSupabaseConfigured()) {
-      saveDatabaseToSupabase(data);
+      // Push explicit deletions FIRST so a removed record can't be revived by
+      // the upsert or the next background sync, then upsert the current state.
+      if (prev) {
+        syncDeletionsToSupabase(prev, data).then(() => saveDatabaseToSupabase(data));
+      } else {
+        saveDatabaseToSupabase(data);
+      }
     }
   } catch (e) {
     console.error('Failed to save data', e);
