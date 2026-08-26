@@ -35,6 +35,8 @@ export default function LeafletMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const layerGroupRef = useRef<any>(null);
+  const didAutoFitRef = useRef(false); // auto-fit the view only once, so it never fights the user's zoom
+  const lastFocusRef = useRef<string | null>(null); // recenter only when the focused location actually changes
 
   const teamById = (id: string) => teams.find(t => t.id === id);
 
@@ -151,10 +153,7 @@ export default function LeafletMap({
               scrollWheelZoom: true,
               doubleClickZoom: true,
               touchZoom: true,
-              zoomSnap: 0.5,
-              zoomDelta: 0.5,
-              wheelPxPerZoomLevel: 90,
-              minZoom: 10,
+              minZoom: 3,
               maxZoom: 19,
               preferCanvas: true // canvas renderer keeps 1000+ pins smooth while zooming
             };
@@ -208,9 +207,16 @@ export default function LeafletMap({
       const bgPts: [number, number][] = []; // pinned / zone points, used only for bounds fallback
       const routePoints: { lat: number; lng: number; title: string; color?: string }[] = [];
 
-      // If redirected to a focused location, center map exactly there
+      // If redirected to a focused location, center map exactly there — but only
+      // when that location changes, so a marker redraw doesn't yank the user back.
       if (focusedLocation && focusedLocation.lat != null && focusedLocation.lng != null) {
-        map.setView([focusedLocation.lat, focusedLocation.lng], 16, { animate: true });
+        const focusKey = `${focusedLocation.lat},${focusedLocation.lng}`;
+        if (lastFocusRef.current !== focusKey) {
+          map.setView([focusedLocation.lat, focusedLocation.lng], 16, { animate: true });
+          lastFocusRef.current = focusKey;
+        }
+      } else {
+        lastFocusRef.current = null;
       }
 
       // ── Zone polygons (named areas cloned from the source map) ──
@@ -311,11 +317,18 @@ export default function LeafletMap({
         });
       }
 
-      if (!focusedLocation && pts.length > 0) {
-        map.fitBounds(pts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
-      } else if (!focusedLocation && pts.length === 0 && bgPts.length > 0) {
-        // No appointments/properties — frame the pinned area / zones instead
-        map.fitBounds(bgPts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
+      // Auto-fit the view ONLY on the first render (or mini-maps, which have no
+      // manual controls). After that we leave the map where the user zoomed it,
+      // so redrawing markers on data changes never resets their zoom/pan.
+      if (!focusedLocation && (isMiniMap || !didAutoFitRef.current)) {
+        if (pts.length > 0) {
+          map.fitBounds(pts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
+          didAutoFitRef.current = true;
+        } else if (bgPts.length > 0) {
+          // No appointments/properties — frame the pinned area / zones instead
+          map.fitBounds(bgPts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
+          didAutoFitRef.current = true;
+        }
       }
 
       setTimeout(() => map.invalidateSize(), 150);
