@@ -2185,6 +2185,20 @@ textarea.inp {
   .stat-box { padding: 14px; }
   .card-h { flex-direction: column; gap: 6px; }
   .card-h h3 { font-size: 14px; }
+
+  /* ── Schedule page: month calendar fits a phone ── */
+  .sched-grid { gap: 10px; }
+  .cal-head { padding: 12px 14px; }
+  .cal-head h3 { font-size: 16px; }
+  .cal-nav { width: 30px; height: 30px; }
+  .cal-dow { padding: 10px 8px 0; gap: 3px; }
+  .cal-dow span { font-size: 8px; letter-spacing: .04em; }
+  .cal-grid { padding: 8px 8px 12px; gap: 4px; }
+  .cal-day { min-height: 54px; padding: 4px; gap: 3px; border-radius: 8px; }
+  .cal-day .n { font-size: 11px; width: 18px; height: 18px; }
+  .cal-day:hover { transform: none; }
+  .cal-dots i { width: 6px; height: 6px; }
+  .cal-ct { font-size: 8px; }
 }
 
 @media (max-width: 480px) {
@@ -2196,6 +2210,15 @@ textarea.inp {
   .stat-box { padding: 10px; min-width: auto; }
   #bigMap { height: 40vh !important; }
   .topbar .logo { font-size: 14px; }
+
+  /* ── Schedule page: tightest phone layout ── */
+  .cal-head { padding: 10px 10px; }
+  .cal-head h3 { font-size: 15px; }
+  .cal-dow { padding: 8px 5px 0; gap: 2px; }
+  .cal-grid { padding: 6px 5px 10px; gap: 3px; }
+  .cal-day { min-height: 46px; padding: 3px; }
+  .cal-day .n { font-size: 10px; width: 16px; height: 16px; }
+  .cal-ct { display: none; }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {

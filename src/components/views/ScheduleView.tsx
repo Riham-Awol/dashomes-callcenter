@@ -447,7 +447,7 @@ export function ScheduleView({
           </span>
         </div>
         <div className="card-b">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '16px' }}>
             {visibleRoutes.length > 0 ? (
               visibleRoutes.map(rt => (
                 <div
