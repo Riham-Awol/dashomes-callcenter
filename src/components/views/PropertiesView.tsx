@@ -443,10 +443,6 @@ export function PropertiesView({
                       <Icon name="home" size={13} /> {p.floors || p.unitFloor || 'G'}
                     </span>
                   </div>
-                  <div className="prop-price">
-                    <b>{fmtMoney(p.price)}</b>
-                    {p.listing === 'rent' ? <small>/mo · {p.leaseDuration || '12 mo'}</small> : <small>sale</small>}
-                  </div>
                 </div>
               </div>
             );
@@ -482,10 +478,6 @@ export function PropertiesView({
                 <div className="prop-lspecs">
                   <span><Icon name="bed" size={12} /> {p.bedrooms || '—'}</span>
                   <span><Icon name="area" size={12} /> {p.sqm || '—'} m²</span>
-                </div>
-                <div className="prop-lprice">
-                  <b>{fmtMoney(p.price)}</b>
-                  <small>{p.listing === 'rent' ? '/mo' : 'sale'}</small>
                 </div>
               </div>
             );
