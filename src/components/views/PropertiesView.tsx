@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ApprovalStatus, DatabaseSchema, Property, PropertyType, Session } from '@/types';
 import { exportCSV, exportToWordDoc, fmtMoney, uid } from '@/lib/utils';
 import { Icon } from '@/lib/icons';
@@ -27,6 +27,9 @@ export function PropertiesView({
   onBookShootForProperty
 }: PropertiesViewProps) {
   const [filter, setFilter] = useState<'all' | 'rent' | 'sale' | PropertyType>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   const [selectedProp, setSelectedProp] = useState<Property | null>(null);
   const [editingProp, setEditingProp] = useState<Property | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -86,6 +89,18 @@ export function PropertiesView({
     const addr = aa.localeCompare(bb, undefined, { sensitivity: 'base' });
     return addr !== 0 ? addr : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   });
+
+  // ── Pagination ──
+  const total = list.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const start = (safePage - 1) * pageSize;
+  const pageItems = list.slice(start, start + pageSize);
+
+  // Reset to first page whenever the filter / search / page size changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter, searchQuery, pageSize]);
 
   const handleOpenForm = (p?: Property | null) => {
     if (p) {
@@ -346,9 +361,46 @@ export function PropertiesView({
         ))}
       </div>
 
-      <div className="prop-grid">
-        {list.length ? (
-          list.map(p => {
+      {/* View toggle + result count + page size */}
+      <div className="prop-toolbar rise" style={{ animationDelay: '.1s' }}>
+        <div className="prop-viewtoggle">
+          <button
+            className={`vt-btn ${viewMode === 'grid' ? 'on' : ''}`}
+            onClick={() => setViewMode('grid')}
+            title="Grid view"
+          >
+            ▦ Grid
+          </button>
+          <button
+            className={`vt-btn ${viewMode === 'list' ? 'on' : ''}`}
+            onClick={() => setViewMode('list')}
+            title="List view"
+          >
+            ☰ List
+          </button>
+        </div>
+        <div className="spacer" />
+        <span className="prop-count">
+          {total ? `${start + 1}–${Math.min(start + pageSize, total)} of ${total}` : '0 results'}
+        </span>
+        <label className="prop-pagesize">
+          Per page
+          <select className="inp" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
+            {[12, 24, 48, 96].map(n => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {total === 0 ? (
+        <div className="empty">
+          <Icon name="home" size={40} />
+          <p>No properties match this filter.</p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="prop-grid">
+          {pageItems.map(p => {
             const status = p.approvalStatus || 'Approved';
             const displayPhoto = p.photos?.[0] || p.photo;
             return (
@@ -398,14 +450,59 @@ export function PropertiesView({
                 </div>
               </div>
             );
-          })
-        ) : (
-          <div className="empty">
-            <Icon name="home" size={40} />
-            <p>No properties match this filter.</p>
-          </div>
-        )}
-      </div>
+          })}
+        </div>
+      ) : (
+        <div className="prop-list">
+          {pageItems.map(p => {
+            const status = p.approvalStatus || 'Approved';
+            const displayPhoto = p.photos?.[0] || p.photo;
+            const team = p.assignedTeamId ? db.teams.find(t => t.id === p.assignedTeamId) : null;
+            return (
+              <div key={p.id} className="prop-lrow" onClick={() => setSelectedProp(p)}>
+                <div className="prop-lthumb">
+                  {displayPhoto ? <img src={displayPhoto} alt={p.name} /> : <Icon name="home" size={22} />}
+                </div>
+                <div className="prop-lmain">
+                  <div className="prop-lname">{p.name}</div>
+                  <div className="prop-laddr"><Icon name="pin" size={11} /> {p.address || '—'}</div>
+                  {team && (
+                    <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                      <span className="team-dot" style={{ background: team.color || '#2E4632' }} /> <b>{team.name}</b>
+                    </div>
+                  )}
+                </div>
+                <div className="prop-lchips">
+                  <span className={`chip ${p.listing === 'sale' ? 'ch-gold' : 'ch-sage'}`} style={{ border: 'none' }}>{p.listing}</span>
+                  <span className="chip ch-blue" style={{ border: 'none' }}>{p.type === 'Other' ? p.customType || 'Other' : p.type}</span>
+                  <span className={`chip ${status === 'Approved' ? 'ch-green' : status === 'Pending' ? 'ch-gold' : 'ch-clay'}`} style={{ border: 'none' }}>
+                    {status === 'Pending' ? '⏳ Pending' : status}
+                  </span>
+                </div>
+                <div className="prop-lspecs">
+                  <span><Icon name="bed" size={12} /> {p.bedrooms || '—'}</span>
+                  <span><Icon name="area" size={12} /> {p.sqm || '—'} m²</span>
+                </div>
+                <div className="prop-lprice">
+                  <b>{fmtMoney(p.price)}</b>
+                  <small>{p.listing === 'rent' ? '/mo' : 'sale'}</small>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pageCount > 1 && (
+        <div className="prop-pager rise">
+          <button className="btn btn-sec" disabled={safePage <= 1} onClick={() => setPage(1)}>« First</button>
+          <button className="btn btn-sec" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>‹ Prev</button>
+          <span className="prop-pageinfo">Page {safePage} of {pageCount}</span>
+          <button className="btn btn-sec" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>Next ›</button>
+          <button className="btn btn-sec" disabled={safePage >= pageCount} onClick={() => setPage(pageCount)}>Last »</button>
+        </div>
+      )}
 
       {/* Property Detail Modal */}
       <Modal
