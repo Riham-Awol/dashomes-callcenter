@@ -1313,6 +1313,31 @@ textarea.inp {
   padding: 3px 8px;
 }
 
+/* Pinned Locations Directory rows */
+.pin-dir-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--sageline);
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  transition: .15s;
+}
+.pin-dir-row:hover {
+  border-color: var(--pine);
+  background: var(--cream2);
+  transform: translateX(2px);
+}
+.pin-dir-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,0.25);
+}
+
 /* schedule calendar */
 .sched-grid {
   display: grid;

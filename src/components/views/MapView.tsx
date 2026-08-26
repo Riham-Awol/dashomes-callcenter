@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { DatabaseSchema, Session } from '@/types';
-import { BOLE_PINNED_LOCATIONS, BOLE_POLYGONS } from '@/lib/pinnedLocations';
+import { BOLE_PINNED_LOCATIONS, BOLE_POLYGONS, COLOR_LEGEND, COLOR_LEGEND_FALLBACK } from '@/lib/pinnedLocations';
 import { isToday } from '@/lib/utils';
+
+const colorLabel = (color?: string) =>
+  COLOR_LEGEND.find(c => c.color.toLowerCase() === (color || '').toLowerCase())?.label || COLOR_LEGEND_FALLBACK;
 
 const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: false });
 
@@ -44,6 +47,39 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
   const [showTodayOnly, setShowTodayOnly] = useState(isFieldAgent);
   const [drawRoutePath, setDrawRoutePath] = useState(true);
 
+  // Pinned-locations directory: search + local map focus
+  const [pinQuery, setPinQuery] = useState('');
+  const [pinFocus, setPinFocus] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+
+  // Live count of pins per colour, for the legend descriptions
+  const legendCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    BOLE_PINNED_LOCATIONS.forEach(p => {
+      const c = (p.color || '#0288D1').toLowerCase();
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+    return m;
+  }, []);
+
+  // Directory list — filtered by search (name / location / phone) and sorted
+  // alphabetically by location (area), then by name.
+  const directory = useMemo(() => {
+    const q = pinQuery.trim().toLowerCase();
+    const digits = q.replace(/\D/g, '');
+    const rows = BOLE_PINNED_LOCATIONS.filter(p => {
+      if (!q) return true;
+      const nameHit = p.name.toLowerCase().includes(q);
+      const locHit = (p.area || '').toLowerCase().includes(q) || (p.address || '').toLowerCase().includes(q);
+      const phoneHit = !!digits && (p.phone || '').replace(/\D/g, '').includes(digits);
+      return nameHit || locHit || phoneHit;
+    });
+    rows.sort((a, b) => {
+      const loc = (a.area || '').localeCompare(b.area || '', undefined, { sensitivity: 'base' });
+      return loc !== 0 ? loc : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+    return rows;
+  }, [pinQuery]);
+
   const toggleType = (k: string) => {
     setTypes(prev => {
       const next = new Set(prev);
@@ -67,6 +103,9 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
   // LeafletMap directly, with their own colours — not mixed into the route).
   const pinnedForMap = types.has('pinned') ? BOLE_PINNED_LOCATIONS : [];
   const polygonsForMap = types.has('zones') ? BOLE_POLYGONS : [];
+
+  // A directory click focuses the map; an external redirect (prop) still wins.
+  const effectiveFocus = focusedLocation || pinFocus;
 
   // Filter appointments: optionally show only today's scheduled, and filter by team for field agents
   let filteredAppointments = showTodayOnly
@@ -138,7 +177,7 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
             teams={db.teams}
             filterTypes={types}
             filterTeams={teams}
-            focusedLocation={focusedLocation}
+            focusedLocation={effectiveFocus}
             drawRoutePath={drawRoutePath}
             pinnedLocations={pinnedForMap}
             polygons={polygonsForMap}
@@ -251,6 +290,79 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
             />
             🗺️ Bole zones (named areas)
           </div>
+
+          <h4>Pin colours</h4>
+          {COLOR_LEGEND.filter(c => (legendCounts.get(c.color.toLowerCase()) || 0) > 0).map(c => (
+            <div key={c.color} className="lg-item" style={{ cursor: 'default', alignItems: 'flex-start' }} title={c.label}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: c.color,
+                  border: c.color.toLowerCase() === '#ffffff' ? '1px solid var(--sageline)' : 'none',
+                  marginTop: '3px',
+                  flexShrink: 0
+                }}
+              />
+              <span style={{ fontSize: '11.5px', lineHeight: 1.35 }}>
+                {c.label} <span style={{ color: 'var(--muted)' }}>({legendCounts.get(c.color.toLowerCase()) || 0})</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pinned Locations Directory — searchable & sorted by location */}
+      <div className="card rise" style={{ animationDelay: '.14s', marginTop: '16px' }}>
+        <div className="card-h">
+          <h3>📇 Pinned Locations Directory</h3>
+          <div className="spacer" />
+          <span className="count-pill">{directory.length}</span>
+        </div>
+        <div className="card-b">
+          <input
+            className="inp"
+            type="search"
+            value={pinQuery}
+            onChange={e => setPinQuery(e.target.value)}
+            placeholder="Search by name, location or phone number…"
+            style={{ marginBottom: '10px' }}
+          />
+          <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginBottom: '10px' }}>
+            Sorted alphabetically by location · click a row to centre it on the map
+          </div>
+          <div style={{ maxHeight: '460px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {directory.length ? (
+              directory.slice(0, 400).map(p => (
+                <div
+                  key={p.id}
+                  className="pin-dir-row"
+                  onClick={() => setPinFocus({ lat: p.lat, lng: p.lng, address: p.address || p.name })}
+                  title={`${colorLabel(p.color)} — click to view on map`}
+                >
+                  <span className="pin-dir-dot" style={{ background: p.color || '#0288D1', border: (p.color || '').toLowerCase() === '#ffffff' ? '1px solid var(--sageline)' : 'none' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--pine)', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.name}
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      📍 {p.area}{p.address ? ` · ${p.address}` : ''}{p.phone ? ` · 📞 ${p.phone}` : ''}
+                    </div>
+                  </div>
+                  <span className="chip ch-gray" style={{ fontSize: '9.5px', flexShrink: 0 }}>{colorLabel(p.color)}</span>
+                </div>
+              ))
+            ) : (
+              <div className="empty"><p>No pinned locations match “{pinQuery}”.</p></div>
+            )}
+          </div>
+          {directory.length > 400 && (
+            <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '8px', textAlign: 'center' }}>
+              Showing first 400 of {directory.length} — refine your search to narrow the list.
+            </div>
+          )}
         </div>
       </div>
     </section>

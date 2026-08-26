@@ -1377,3 +1377,33 @@ export const BOLE_POLYGONS: MapPolygon[] = [
   { id: 'zone_21', name: "bole dembel", color: '#F57C00', coordinates: [[9.006569,38.775234],[9.010072,38.770412],[9.009353,38.765163],[9.004721,38.763151],[9.001253,38.767211],[9.00365,38.768151],[8.997674,38.772048],[8.998942,38.773719],[9.006569,38.775234]] },
   { id: 'zone_22', name: "bole", color: '#87CEAC', coordinates: [[8.998891,38.756249],[8.986295,38.75629],[8.974129,38.770377],[8.988581,38.796855],[8.999993,38.792999],[9.005545,38.782292],[9.007297,38.78201],[9.006912,38.776854],[9.011903,38.767658],[9.011395,38.761606],[9.008183,38.760413],[8.998891,38.756249]] },
 ];
+
+// Human-readable description for each source-map marker colour.
+// These labels are best-effort (derived from what the pins of each colour
+// actually contain) — edit the `label` values to match your own categories.
+// Counts are computed live from BOLE_PINNED_LOCATIONS, so you don't set them here.
+export interface ColorLegendEntry {
+  color: string;
+  label: string;
+}
+
+export const COLOR_LEGEND: ColorLegendEntry[] = [
+  { color: '#0288D1', label: 'Developer / real-estate listings' },
+  { color: '#FFEA00', label: 'Furnished & luxury apartments' },
+  { color: '#C2185B', label: 'Landmark-area listings (Meskel Flower, Atlas, Michael…)' },
+  { color: '#000000', label: 'Real-estate agencies (PLC)' },
+  { color: '#558B2F', label: 'Buildings, plazas & construction' },
+  { color: '#BDBDBD', label: 'Guest houses' },
+  { color: '#F57C00', label: 'Serviced apartments & lofts' },
+  { color: '#9C27B0', label: 'Furnished rentals' },
+  { color: '#795548', label: 'Villas & duplexes' },
+  { color: '#4E342E', label: 'Guest-house rentals' },
+  { color: '#FFD600', label: 'Apartment leads' },
+  { color: '#FF5252', label: 'Plazas / commercial' },
+  { color: '#673AB7', label: 'Mosa building' },
+  { color: '#880E4F', label: 'Haramaya University area' },
+  { color: '#FBC02D', label: 'Ramzii Husen' },
+];
+
+// Fallback description used for any colour not listed above.
+export const COLOR_LEGEND_FALLBACK = 'Other pinned location';
