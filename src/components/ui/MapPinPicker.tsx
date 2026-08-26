@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { localMatches, GazetteerLocation } from '@/lib/gazetteer';
+import { localMatches } from '@/lib/gazetteer';
+import { BOLE_PINNED_LOCATIONS } from '@/lib/pinnedLocations';
 
 const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: false });
 
@@ -14,15 +15,46 @@ interface MapPinPickerProps {
 export function MapPinPicker({ initialPin, onPinChange }: MapPinPickerProps) {
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(initialPin || null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<
-    { name: string; lat: number; lng: number; isOnline?: boolean }[]
-  >([]);
   const [searching, setSearching] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [onlineResults, setOnlineResults] = useState<
+    { name: string; lat: number; lng: number; isOnline?: boolean }[]
+  >([]);
 
   useEffect(() => {
     setPin(initialPin || null);
   }, [initialPin]);
+
+  // Instant local matches from the imported pinned map (apartment / place names)
+  // plus the area gazetteer — searched by name, area, or address.
+  const localResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as { name: string; lat: number; lng: number; kind: 'pin' | 'area' }[];
+
+    const pins = BOLE_PINNED_LOCATIONS.filter(
+      p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.area || '').toLowerCase().includes(q) ||
+        (p.address || '').toLowerCase().includes(q)
+    )
+      .slice(0, 25)
+      .map(p => ({ name: `📌 ${p.name} · ${p.area}`, lat: p.lat, lng: p.lng, kind: 'pin' as const }));
+
+    const areas = localMatches(searchQuery).map(m => ({
+      name: `🏘 ${m.name}`,
+      lat: m.lat,
+      lng: m.lng,
+      kind: 'area' as const
+    }));
+
+    return [...pins, ...areas];
+  }, [searchQuery]);
+
+  // Clear any previous online results when the query changes
+  useEffect(() => {
+    setOnlineResults([]);
+    setStatusMsg('');
+  }, [searchQuery]);
 
   const handlePlace = (lat: number, lng: number) => {
     const newPin = { lat, lng };
@@ -36,14 +68,9 @@ export function MapPinPicker({ initialPin, onPinChange }: MapPinPickerProps) {
 
     setSearching(true);
     setStatusMsg('');
-    const loc = localMatches(s);
-    const results: { name: string; lat: number; lng: number; isOnline?: boolean }[] = loc.map(m => ({
-      name: '🏘 ' + m.name,
-      lat: m.lat,
-      lng: m.lng,
-      isOnline: false
-    }));
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const online: { name: string; lat: number; lng: number; isOnline?: boolean }[] = [];
     try {
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 4500);
@@ -54,8 +81,9 @@ export function MapPinPicker({ initialPin, onPinChange }: MapPinPickerProps) {
       clearTimeout(to);
       const j = await r.json();
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       j.forEach((x: any) => {
-        results.push({
+        online.push({
           name: '🌐 ' + x.display_name.split(',').slice(0, 3).join(','),
           lat: +x.lat,
           lng: +x.lon,
@@ -63,25 +91,28 @@ export function MapPinPicker({ initialPin, onPinChange }: MapPinPickerProps) {
         });
       });
 
-      if (!results.length) {
-        setStatusMsg('No matches — click the map or use an area name (Bole, Kazanchis…).');
+      if (!online.length && !localResults.length) {
+        setStatusMsg('No matches — click the map, or type part of an apartment / area name.');
       }
     } catch (e) {
-      if (!results.length) {
-        setStatusMsg('Geocoder offline — try an Addis area name, or click the map.');
+      if (!localResults.length) {
+        setStatusMsg('Online geocoder unavailable — pinned & area names still work, or click the map.');
       }
     } finally {
-      setSearchResults(results);
+      setOnlineResults(online);
       setSearching(false);
     }
   };
+
+  // Instant local matches first, then any online geocoder results
+  const searchResults = [...localResults, ...onlineResults];
 
   return (
     <div className="picker-box">
       <div style={{ display: 'flex', gap: '8px' }}>
         <input
           className="inp"
-          placeholder="Search area — Bole, Kazanchis, CMC…"
+          placeholder="Search apartment / place name or area — e.g. Atlas, Medhanialem, Bole…"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           onKeyDown={e => {
