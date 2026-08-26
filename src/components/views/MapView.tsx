@@ -74,8 +74,13 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
       return nameHit || locHit || phoneHit;
     });
     rows.sort((a, b) => {
-      const loc = (a.area || '').localeCompare(b.area || '', undefined, { sensitivity: 'base' });
-      return loc !== 0 ? loc : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      const aa = (a.address || '').trim();
+      const bb = (b.address || '').trim();
+      // Pins without an address sort to the end, then alphabetical by address, then name.
+      if (!aa && bb) return 1;
+      if (aa && !bb) return -1;
+      const addr = aa.localeCompare(bb, undefined, { sensitivity: 'base' });
+      return addr !== 0 ? addr : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
     return rows;
   }, [pinQuery]);
@@ -331,7 +336,7 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
             style={{ marginBottom: '10px' }}
           />
           <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginBottom: '10px' }}>
-            Sorted alphabetically by location · click a row to centre it on the map
+            Sorted alphabetically by address · click a row to centre it on the map
           </div>
           <div style={{ maxHeight: '460px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {directory.length ? (
