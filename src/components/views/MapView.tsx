@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { DatabaseSchema, Session } from '@/types';
-import { BOLE_PINNED_LOCATIONS } from '@/lib/pinnedLocations';
+import { BOLE_PINNED_LOCATIONS, BOLE_POLYGONS } from '@/lib/pinnedLocations';
 import { isToday } from '@/lib/utils';
 
 const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: false });
@@ -15,7 +15,7 @@ interface MapViewProps {
 }
 
 export function MapView({ db, session, focusedLocation }: MapViewProps) {
-  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property', 'pinned']));
+  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property', 'pinned', 'zones']));
 
   const isFieldAgent = session?.role === 'Team Member (Field Agent)';
 
@@ -63,25 +63,10 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
     });
   };
 
-  // Build pinned location markers as pseudo-appointments for LeafletMap
-  const pinnedAsAppointments = types.has('pinned')
-    ? BOLE_PINNED_LOCATIONS.map(pin => ({
-        id: pin.id,
-        name: pin.name,
-        address: pin.address || `${pin.area}, Bole Subcity`,
-        kind: 'owner' as const,
-        dt: new Date().toISOString(),
-        status: 'Scheduled' as const,
-        teamId: isFieldAgent && userTeam ? userTeam.id : '',
-        phone: pin.phone || '',
-        lat: pin.lat,
-        lng: pin.lng,
-        isPinned: true,
-        contactId: '',
-        propId: '',
-        notes: ''
-      }))
-    : [];
+  // Pinned locations & zone polygons cloned from the source map (rendered by
+  // LeafletMap directly, with their own colours — not mixed into the route).
+  const pinnedForMap = types.has('pinned') ? BOLE_PINNED_LOCATIONS : [];
+  const polygonsForMap = types.has('zones') ? BOLE_POLYGONS : [];
 
   // Filter appointments: optionally show only today's scheduled, and filter by team for field agents
   let filteredAppointments = showTodayOnly
@@ -92,7 +77,7 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
     filteredAppointments = filteredAppointments.filter(a => a.teamId === userTeam.id);
   }
 
-  const allAppointments = [...filteredAppointments, ...pinnedAsAppointments];
+  const allAppointments = filteredAppointments;
 
   return (
     <section className="view on" id="view-map">
@@ -114,7 +99,8 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
           ['broker', 'Broker shoots'],
           ['owner', 'Owner visits'],
           ['property', 'Properties'],
-          ['pinned', '📌 Pinned Locations']
+          ['pinned', '📌 Pinned Locations'],
+          ['zones', '🗺️ Bole Zones']
         ].map(([k, l]) => (
           <button
             key={k}
@@ -154,6 +140,8 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
             filterTeams={teams}
             focusedLocation={focusedLocation}
             drawRoutePath={drawRoutePath}
+            pinnedLocations={pinnedForMap}
+            polygons={polygonsForMap}
           />
         </div>
 
@@ -245,10 +233,23 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
                 width: '10px',
                 height: '10px',
                 borderRadius: '50%',
-                background: '#0288D1'
+                background: 'conic-gradient(#0288D1, #FFEA00, #C2185B, #558B2F, #9C27B0, #0288D1)'
               }}
             />
-            📌 Pinned (Bole gazetteer)
+            📌 Pinned locations (source-map colors)
+          </div>
+          <div className="lg-item" style={{ cursor: 'default' }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: '14px',
+                height: '10px',
+                borderRadius: '3px',
+                background: 'rgba(57,73,171,0.18)',
+                border: '1.5px solid #3949AB'
+              }}
+            />
+            🗺️ Bole zones (named areas)
           </div>
         </div>
       </div>

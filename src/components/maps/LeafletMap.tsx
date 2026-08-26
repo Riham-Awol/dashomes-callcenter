@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Appointment, Property, Team } from '@/types';
 import { fmtDT, fmtMoney } from '@/lib/utils';
+import { PinnedLocation, MapPolygon } from '@/lib/pinnedLocations';
 
 interface LeafletMapProps {
   appointments?: Appointment[];
@@ -14,6 +15,8 @@ interface LeafletMapProps {
   focusedLocation?: { lat: number; lng: number; label?: string } | null;
   drawRoutePath?: boolean;
   onMapClick?: (lat: number, lng: number) => void;
+  pinnedLocations?: PinnedLocation[];
+  polygons?: MapPolygon[];
 }
 
 export default function LeafletMap({
@@ -25,7 +28,9 @@ export default function LeafletMap({
   filterTeams = new Set(),
   focusedLocation,
   drawRoutePath = true,
-  onMapClick
+  onMapClick,
+  pinnedLocations = [],
+  polygons = []
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -140,14 +145,30 @@ export default function LeafletMap({
 
       if (!mapInstanceRef.current) {
         const mapOptions = isMiniMap
-          ? { zoomControl: false, scrollWheelZoom: false }
-          : { zoomControl: true };
+          ? { zoomControl: false, scrollWheelZoom: false, preferCanvas: true }
+          : {
+              zoomControl: true,
+              scrollWheelZoom: true,
+              doubleClickZoom: true,
+              touchZoom: true,
+              zoomSnap: 0.5,
+              zoomDelta: 0.5,
+              wheelPxPerZoomLevel: 90,
+              minZoom: 10,
+              maxZoom: 19,
+              preferCanvas: true // canvas renderer keeps 1000+ pins smooth while zooming
+            };
 
         const initialLat = focusedLocation?.lat || 9.005;
         const initialLng = focusedLocation?.lng || 38.79;
         const initialZoom = focusedLocation ? 16 : 12;
 
         const map = L.map(containerRef.current, mapOptions).setView([initialLat, initialLng], initialZoom);
+
+        // Put the zoom +/- control where it is easy to reach on phones
+        if (!isMiniMap) {
+          map.zoomControl.setPosition('topright');
+        }
 
         // Tile layer with fallback
         const TILES = [
@@ -157,12 +178,12 @@ export default function LeafletMap({
         ];
 
         let idx = 0;
-        let layer = L.tileLayer(TILES[0][0], { attribution: TILES[0][1] }).addTo(map);
+        let layer = L.tileLayer(TILES[0][0], { attribution: TILES[0][1], maxZoom: 19 }).addTo(map);
         layer.on('tileerror', () => {
           if (idx < TILES.length - 1) {
             idx++;
             try { map.removeLayer(layer); } catch (e) { }
-            layer = L.tileLayer(TILES[idx][0], { attribution: TILES[idx][1] }).addTo(map);
+            layer = L.tileLayer(TILES[idx][0], { attribution: TILES[idx][1], maxZoom: 19 }).addTo(map);
           }
         });
 
@@ -184,11 +205,50 @@ export default function LeafletMap({
 
       layerGroup.clearLayers();
       const pts: [number, number][] = [];
+      const bgPts: [number, number][] = []; // pinned / zone points, used only for bounds fallback
       const routePoints: { lat: number; lng: number; title: string; color?: string }[] = [];
 
       // If redirected to a focused location, center map exactly there
       if (focusedLocation && focusedLocation.lat != null && focusedLocation.lng != null) {
         map.setView([focusedLocation.lat, focusedLocation.lng], 16, { animate: true });
+      }
+
+      // ── Zone polygons (named areas cloned from the source map) ──
+      polygons.forEach(zone => {
+        if (!zone.coordinates || zone.coordinates.length < 3) return;
+        const poly = L.polygon(zone.coordinates, {
+          color: zone.color,
+          weight: 2,
+          opacity: 0.9,
+          fillColor: zone.color,
+          fillOpacity: 0.12
+        })
+          .bindTooltip(zone.name, { sticky: true, direction: 'top', className: 'zone-tip' })
+          .bindPopup(`<div class="pop-t">${zone.name}</div><div class="pop-m">Bole zone / area</div>`);
+        layerGroup.addLayer(poly);
+        zone.coordinates.forEach(c => bgPts.push([c[0], c[1]]));
+      });
+
+      // ── Pinned locations (colored markers cloned from the source map) ──
+      if (filterTypes.has('pinned') || isMiniMap) {
+        pinnedLocations.forEach(pin => {
+          if (pin.lat == null || pin.lng == null) return;
+          const color = pin.color || '#0288D1';
+          const marker = L.circleMarker([pin.lat, pin.lng], {
+            radius: 5,
+            color: '#ffffff',
+            weight: 1,
+            fillColor: color,
+            fillOpacity: 0.95
+          }).bindPopup(
+            `<div class="pop-t">${pin.name}</div>` +
+            `<div class="pop-m">${pin.address || pin.area + ', Bole Subcity'}</div>` +
+            `<div style="margin-top:5px"><span class="team-dot" style="background:${color}"></span><b>${pin.area}</b></div>` +
+            (pin.phone ? `<div style="margin-top:4px;font:500 11px 'IBM Plex Mono';color:var(--muted)">📞 ${pin.phone}</div>` : '')
+          );
+          layerGroup.addLayer(marker);
+          bgPts.push([pin.lat, pin.lng]);
+        });
       }
 
       appointments.forEach(a => {
@@ -253,6 +313,9 @@ export default function LeafletMap({
 
       if (!focusedLocation && pts.length > 0) {
         map.fitBounds(pts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
+      } else if (!focusedLocation && pts.length === 0 && bgPts.length > 0) {
+        // No appointments/properties — frame the pinned area / zones instead
+        map.fitBounds(bgPts, { padding: isMiniMap ? [24, 24] : [36, 36], maxZoom: 14 });
       }
 
       setTimeout(() => map.invalidateSize(), 150);
@@ -263,7 +326,7 @@ export default function LeafletMap({
     return () => {
       isMounted = false;
     };
-  }, [appointments, properties, teams, isMiniMap, filterTypes, filterTeams, focusedLocation, drawRoutePath]);
+  }, [appointments, properties, teams, isMiniMap, filterTypes, filterTeams, focusedLocation, drawRoutePath, pinnedLocations, polygons]);
 
   useEffect(() => {
     return () => {
