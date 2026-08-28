@@ -18,7 +18,9 @@ interface MapViewProps {
 }
 
 export function MapView({ db, session, focusedLocation }: MapViewProps) {
-  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property', 'pinned', 'zones']));
+  // Default view: today's booked shoots + the shortest route. Pins/zones are
+  // heavy (1300+ markers) and off by default — toggle them on when needed.
+  const [types, setTypes] = useState<Set<string>>(new Set(['broker', 'owner', 'property']));
 
   const isFieldAgent = session?.role === 'Team Member (Field Agent)';
 
@@ -44,7 +46,7 @@ export function MapView({ db, session, focusedLocation }: MapViewProps) {
     return s;
   });
 
-  const [showTodayOnly, setShowTodayOnly] = useState(isFieldAgent);
+  const [showTodayOnly, setShowTodayOnly] = useState(true);
   const [drawRoutePath, setDrawRoutePath] = useState(true);
 
   // Pinned-locations directory: search + local map focus

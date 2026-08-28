@@ -97,6 +97,13 @@ function normalizeAppointments(data: DatabaseSchema): DatabaseSchema {
     data.appointments = [];
   }
 
+  // Drop auto-generated / seeded schedule fillers (old "Generate Tomorrow" and
+  // pinned-fill routes). Real appointments are only ever created by the operator
+  // and never carry these id prefixes.
+  data.appointments = data.appointments.filter(
+    a => !(typeof a.id === 'string' && (a.id.startsWith('pin_fill_') || a.id.startsWith('prop_fill_')))
+  );
+
   data.appointments = data.appointments.map(appt => ({
     ...appt,
     isShoot: appt.isShoot ?? (appt.kind === 'broker' ? true : false),

@@ -271,120 +271,39 @@ export interface TeamDaily15Route {
   }[];
 }
 
-// Generate exactly 15 assigned properties/visits for each active daily team
+// Build each active team's route for TODAY strictly from real appointments
+// (shoots the call operator actually booked). No fabricated / seeded fillers.
 export function generateTeamDaily15Routes(
   appointments: Appointment[],
-  properties: Property[],
+  _properties: Property[],
   activeTeams: Team[],
-  pinnedLocations?: { id: string; name: string; lat: number; lng: number; area: string; address?: string; phone?: string }[]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _pinnedLocations?: { id: string; name: string; lat: number; lng: number; area: string; address?: string; phone?: string }[]
 ): TeamDaily15Route[] {
   if (!activeTeams || activeTeams.length === 0) return [];
 
-  const balancedAppts = balanceTeamWorkload(appointments, activeTeams);
-  const pins = pinnedLocations || [];
+  return activeTeams.map(t => {
+    const teamAppts = appointments
+      .filter(a => a.teamId === t.id && isToday(a.dt))
+      .sort((a, b) => (a.dt || '').localeCompare(b.dt || ''));
 
-  // ── Step 0: real bookings (appointments) per team — these are the ONLY shoots.
-  // A property counts as a shoot only when it actually has an appointment today.
-  const teamItems: TeamDaily15Route['items'][] = activeTeams.map(t => {
-    const teamAppts = balancedAppts.filter(a => a.teamId === t.id && isToday(a.dt));
-    return teamAppts.map(a => ({
+    const items: TeamDaily15Route['items'] = teamAppts.map(a => ({
       id: a.id,
       title: `${a.name} (${a.kind})`,
       address: a.address,
-      kind: 'Booking' as const,
+      kind: 'Booking',
       lat: a.lat,
       lng: a.lng,
       time: a.dt ? fmtTime(a.dt) : '10:00 AM',
       status: a.status,
-      phone: a.phone || '+251 91 122 3344',
+      phone: a.phone || '',
       notes: a.notes || `${a.kind === 'broker' ? 'Broker photo shoot' : 'Owner building visit'} & property intake`,
       contactName: a.name,
       incompletionReason: a.incompletionReason,
       originalAppointment: a
     }));
+
+    return { team: t, items };
   });
-
-  // Addresses already covered by a booking on ANY team — never assign them again.
-  const bookedAddresses = new Set<string>();
-  teamItems.forEach(items =>
-    items.forEach(it => {
-      const k = (it.address || '').trim().toLowerCase();
-      if (k) bookedAddresses.add(k);
-    })
-  );
-
-  // ── Build ONE shared, de-duplicated fill pool, then hand each team a DIFFERENT
-  // slice via round-robin — so no two teams get the same place.
-  const usedFill = new Set<string>();
-  const propFill = properties
-    .filter(p => (p.approvalStatus || 'Approved') === 'Approved')
-    .filter(p => {
-      const k = (p.address || '').trim().toLowerCase();
-      if (!k || bookedAddresses.has(k) || usedFill.has(k)) return false;
-      usedFill.add(k);
-      return true;
-    })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map(p => ({ source: 'prop' as const, ref: p as any }));
-
-  const pinFill = pins
-    .filter(pin => {
-      const k = (pin.address || `${pin.name}|${pin.lat},${pin.lng}`).trim().toLowerCase();
-      if (usedFill.has(k)) return false;
-      usedFill.add(k);
-      return true;
-    })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map(pin => ({ source: 'pin' as const, ref: pin as any }));
-
-  const pool = [...propFill, ...pinFill];
-
-  let cursor = 0;
-  let progressing = true;
-  while (cursor < pool.length && progressing) {
-    progressing = false;
-    for (let ti = 0; ti < activeTeams.length; ti++) {
-      if (teamItems[ti].length >= 15 || cursor >= pool.length) continue;
-      const t = activeTeams[ti];
-      const slot = teamItems[ti].length;
-      const time = `${9 + (slot % 8)}:${slot % 2 === 0 ? '00' : '30'} AM`;
-      const entry = pool[cursor++];
-      progressing = true;
-
-      if (entry.source === 'prop') {
-        const pr = entry.ref;
-        teamItems[ti].push({
-          id: `prop_fill_${t.id}_${pr.id}`,
-          title: `Property Visit: ${pr.name}`,
-          address: pr.address,
-          kind: 'Pinned Property',
-          lat: pr.lat,
-          lng: pr.lng,
-          time,
-          status: 'Scheduled',
-          phone: pr.phone || '+251 91 234 5678',
-          notes: pr.notes || 'Approved property — no appointment yet (survey / intake visit)',
-          contactName: pr.owner || pr.name
-        });
-      } else {
-        const pin = entry.ref;
-        teamItems[ti].push({
-          id: `pin_fill_${t.id}_${pin.id}`,
-          title: `📌 ${pin.name}`,
-          address: pin.address || `${pin.area}, Bole Subcity`,
-          kind: 'Pinned Property',
-          lat: pin.lat,
-          lng: pin.lng,
-          time,
-          status: 'Scheduled',
-          phone: pin.phone || '+251 91 555 7788',
-          notes: `Bole area pinned survey — ${pin.area} (no appointment yet)`,
-          contactName: pin.name
-        });
-      }
-    }
-  }
-
-  return activeTeams.map((t, i) => ({ team: t, items: teamItems[i].slice(0, 15) }));
 }
 
