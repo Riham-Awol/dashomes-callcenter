@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Appointment, AppointmentStatus, DatabaseSchema, Session } from '@/types';
-import { dOff, fmtTime, generateTeamDaily15Routes, localYMD, pad, TeamDaily15Route, todayYMD, uid } from '@/lib/utils';
+import { fmtTime, generateTeamDaily15Routes, localYMD, pad, TeamDaily15Route, todayYMD, uid } from '@/lib/utils';
 import { Icon } from '@/lib/icons';
 import { Modal } from '@/components/ui/Modal';
 import { BOLE_PINNED_LOCATIONS } from '@/lib/pinnedLocations';
+
+const LeafletMap = dynamic(() => import('@/components/maps/LeafletMap'), { ssr: false });
 
 interface ScheduleViewProps {
   db: DatabaseSchema;
@@ -86,6 +89,13 @@ export function ScheduleView({
     db.appointments.filter(a => localYMD(a.dt) === ymd).sort((a, b) => a.dt.localeCompare(b.dt));
 
   const dayList = apptsOn(selDay);
+
+  // Stops for the selected day's route map — respect the field-agent / team filter.
+  const routeMapAppts = dayList.filter(a => {
+    if (isFieldAgent && userTeam) return a.teamId === userTeam.id;
+    if (selectedTeamIdFilter !== 'all') return a.teamId === selectedTeamIdFilter;
+    return true;
+  });
   const selDateObj = new Date(selDay + 'T00:00');
   const dayTitle = isNaN(selDateObj.getTime())
     ? selDay
@@ -163,19 +173,8 @@ export function ScheduleView({
       if (targetStatus === 'Incomplete') {
         appt.incompletionReason = incompletionReason.trim();
 
-        // AUTOMATIC WORKFLOW: Route incomplete appointment back to Call Center Operator Follow-Up queue
-        draft.followups.unshift({
-          id: uid(),
-          doc: todayYMD(),
-          name: appt.name,
-          phone: appt.phone || '+251 91 100 2233',
-          property: appt.address,
-          status: 'Waiting for manager approval',
-          next: dOff(1),
-          action: `[INCOMPLETE REASON]: ${incompletionReason.trim()} (Field Team: ${session.name})`,
-          priority: 'High'
-        });
-
+        // Incomplete shoots are logged on the appointment + notified, but no
+        // follow-up record is created (follow-ups are disabled).
         if (!draft.notifications) draft.notifications = [];
         draft.notifications.unshift({
           id: uid(),
@@ -668,6 +667,38 @@ export function ScheduleView({
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Field Route & Shortest Path map for the selected day */}
+      <div className="card rise full" style={{ animationDelay: '.16s', marginTop: '20px' }}>
+        <div className="card-h">
+          <h3>🛣️ Field Route & Shortest Path — {dayTitle}</h3>
+          <div className="spacer" />
+          <span className="mono" style={{ fontSize: '12px', color: 'var(--muted)' }}>
+            {routeMapAppts.length} stop{routeMapAppts.length === 1 ? '' : 's'} · nearest-neighbour order
+          </span>
+        </div>
+        <div className="card-b">
+          <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginBottom: '10px' }}>
+            Numbered 1 → {routeMapAppts.length} in shortest driving order, connected by the gold route line.
+          </div>
+          {routeMapAppts.length > 0 ? (
+            <div style={{ height: '440px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--sageline)' }}>
+              <LeafletMap
+                appointments={routeMapAppts}
+                teams={db.teams}
+                filterTypes={new Set(['broker', 'owner', 'property'])}
+                filterTeams={new Set<string>()}
+                drawRoutePath={true}
+              />
+            </div>
+          ) : (
+            <div className="empty">
+              <Icon name="pin" size={36} />
+              <p>No mapped stops for this day. Book shoots with a pinned location to see the route.</p>
+            </div>
+          )}
         </div>
       </div>
 

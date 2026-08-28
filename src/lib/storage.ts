@@ -104,13 +104,8 @@ function normalizeAppointments(data: DatabaseSchema): DatabaseSchema {
     a => !(typeof a.id === 'string' && (a.id.startsWith('pin_fill_') || a.id.startsWith('prop_fill_')))
   );
 
-  // Drop auto-created "completed shoot archived" follow-ups. Follow-ups should
-  // only come from the operator or from a team marking a shoot Incomplete.
-  if (Array.isArray(data.followups)) {
-    data.followups = data.followups.filter(
-      f => !(typeof f.action === 'string' && f.action.includes('[COMPLETED SHOOT ARCHIVED]'))
-    );
-  }
+  // Follow-ups are disabled — never load any follow-up records.
+  data.followups = [];
 
   data.appointments = data.appointments.map(appt => ({
     ...appt,
