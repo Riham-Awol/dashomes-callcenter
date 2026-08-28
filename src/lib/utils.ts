@@ -271,6 +271,29 @@ export interface TeamDaily15Route {
   }[];
 }
 
+// Order stops into the shortest driving order (nearest-neighbour TSP), starting
+// from the earliest-booked stop. Stops without coordinates keep their order at
+// the end.
+function orderByShortestRoute<T extends { lat?: number | null; lng?: number | null }>(items: T[]): T[] {
+  const withGeo = items.filter(i => i.lat != null && i.lng != null);
+  const noGeo = items.filter(i => i.lat == null || i.lng == null);
+  if (withGeo.length < 3) return [...withGeo, ...noGeo];
+
+  const remaining = [...withGeo];
+  const ordered: T[] = [remaining.shift()!];
+  while (remaining.length) {
+    const last = ordered[ordered.length - 1];
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const d = getDistanceKm(last.lat!, last.lng!, remaining[i].lat!, remaining[i].lng!);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    ordered.push(remaining.splice(best, 1)[0]);
+  }
+  return [...ordered, ...noGeo];
+}
+
 // Build each active team's route for TODAY strictly from real appointments
 // (shoots the call operator actually booked). No fabricated / seeded fillers.
 export function generateTeamDaily15Routes(
@@ -303,7 +326,8 @@ export function generateTeamDaily15Routes(
       originalAppointment: a
     }));
 
-    return { team: t, items };
+    // Number the stops in shortest-route (nearest-neighbour) driving order.
+    return { team: t, items: orderByShortestRoute(items) };
   });
 }
 

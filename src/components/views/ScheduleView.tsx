@@ -409,9 +409,25 @@ export function ScheduleView({
                       {rt.items.length} shoot{rt.items.length === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' }}>
                     Active Members Today: <b>{rt.team.members?.length ? rt.team.members.map(m => m.name).join(', ') : rt.team.lead || 'Team Active'}</b>
                   </div>
+
+                  {rt.items.length > 1 && (
+                    <div style={{ fontSize: '11px', color: 'var(--gold)', fontWeight: 600, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <span>🛣️ Stops in shortest-route order (1 → {rt.items.length})</span>
+                      {rt.items[0]?.lat != null && rt.items[0]?.lng != null && (
+                        <button
+                          className="btn btn-sm btn-subtle"
+                          style={{ fontSize: '10px', padding: '2px 7px' }}
+                          onClick={() => handleAddressClick(rt.items[0].lat, rt.items[0].lng, rt.items[0].address)}
+                          title="Open the field map with the shortest route drawn"
+                        >
+                          🗺️ Route on Map
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto' }}>
                     {rt.items.length === 0 && (
