@@ -219,20 +219,14 @@ async function upsertTable(
         console.error(`Supabase upsert error on ${table}:`, upsertErr);
         return false;
       }
-
-      // Delete stale rows that were removed from app state, but ONLY if we have an active dataset
-      if (currentIds.length > 0) {
-        const { error: delErr } = await sb
-          .from(table)
-          .delete()
-          .not(pkColumn, 'in', `(${currentIds.map(id => `"${id.replace(/"/g, '\\"')}"`).join(',')})`);
-        if (delErr) {
-          console.error(`Supabase delete-stale error on ${table}:`, delErr);
-        }
-      }
     }
-    // Safety: If rows is empty ([]), do NOT execute mass DELETE ALL on Supabase.
-    // Empty state should never wipe remote database automatically.
+    // NOTE: We intentionally do NOT delete "stale" rows here. Saves only
+    // insert/update. Real deletions are handled precisely by
+    // syncDeletionsToSupabase(prev, next), which removes only the rows the user
+    // actually deleted. A blanket "delete everything not in the current set"
+    // was destroying data: the 8s background sync can briefly replace the
+    // in-memory state with a remote snapshot missing a just-added row, and the
+    // next save would then purge it. Never mass-delete from a save.
     return true;
   } catch (e) {
     console.error(`Supabase upsertTable error on ${table}:`, e);
